@@ -4,6 +4,33 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db import models
 
 
+class AllProductsManager:
+
+    @staticmethod
+    def get_products_for_mainpage(*args, **kwargs):
+        sort_priority_model = kwargs.get('sort_priority_model')
+        products = []
+        ct_models = ContentType.objects.filter(model__in=args)
+
+        for ct_model in ct_models:
+            prod = ct_model.model_class()._base_manager.all().order_by('-id')
+            products.extend(prod)
+        if sort_priority_model:
+            ct_model = ContentType.objects.filter(model=sort_priority_model)
+            if ct_model.exists() and sort_priority_model in args:
+                return sorted(
+                    products, 
+                    key=lambda model: model.__class__._meta.model_name.startswith(sort_priority_model),
+                    reverse=True
+                )
+        return products
+
+
+class AllProducts:
+
+    objects = AllProductsManager()
+
+
 class Category(models.Model):
 
     name = models.CharField(max_length=255, verbose_name='Категория')
@@ -27,6 +54,37 @@ class Product(models.Model):
 
     def __str__(self):
         return f'{self.name}- {self.price}$'
+
+
+class NotebookProduct(Product):
+
+    diagonal = models.CharField(max_length=255, verbose_name='Диагональ')
+    display = models.CharField(max_length=255, verbose_name='Дисплей')
+    processor = models.CharField(max_length=255, verbose_name='Частота процессора')
+    ram = models.CharField(max_length=255, verbose_name='Оперативная память')
+    time_without_charge = models.CharField(max_length=255, verbose_name='Время работы аккумулятора')
+
+    image = models.ImageField(verbose_name='Изображение ноутбука', upload_to='notebooks/')
+    
+    def __str__(self):
+        return f'{self.category.name}- {self.name}'
+
+
+class SmartphoneProduct(Product):
+    
+    diagonal = models.CharField(max_length=255, verbose_name='Диагональ')
+    display = models.CharField(max_length=255, verbose_name='Дисплей')
+    resolution = models.CharField(max_length=255, verbose_name='Разрешение экрана')
+    ram = models.CharField(max_length=255, verbose_name='Оперативная память')
+    sd = models.BooleanField(default=True, verbose_name='Встраиваемая память')
+    sd_max_volume = models.CharField(max_length=255, verbose_name='Максимальный объем встраиваемой памяти')
+    main_camera_mp = models.CharField(max_length=255, verbose_name='Главная камера')
+    frontal_camera_mp = models.CharField(max_length=255, verbose_name='Фронтальная камера')
+
+    image = models.ImageField(verbose_name='Изображение смартфона', upload_to='smartphones/')
+
+    def __str__(self):
+        return f'{self.category.name}- {self.name}'
 
 
 class CartProduct(models.Model):
