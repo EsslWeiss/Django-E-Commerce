@@ -17,8 +17,13 @@ class NotebookAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['image'].help_text = mark_safe(
                 '<strong style="color: green; font-size: 14px;">Диапазон допустимых разрешений \
-                для загруженых изображений: {}x{} - {}x{}!<strong>'\
-                .format(*Product.MIN_RESOLUTION, *Product.MAX_RESOLUTION))
+                для загруженых изображений: {}x{} - {}x{}!<strong><br> \
+                <strong style="color: red; font-size: 14px">При загрузке изображения больше \
+                {}x{} оно будет обрезано до размера {}x{}!<strong>'
+                .format(*Product.MIN_RESOLUTION, 
+                    *Product.MAX_RESOLUTION * 2,
+                    *Product.OPTIMAL_RESOLUTION)
+                )
 
     def clean_image(self):
         image = self.cleaned_data['image']

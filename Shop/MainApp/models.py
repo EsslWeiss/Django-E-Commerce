@@ -1,14 +1,22 @@
 import sys
+
+from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db import models
 
 from .custom_exceptions import MinResolutionErrorException
+
 from PIL import Image
 from io import BytesIO
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
+
+
+def get_product_url(obj, viewname): 
+    ct_model = obj.__class__._meta.model_name  # get model name in lowercase
+    return reverse(viewname, kwargs={'ct_model': ct_model, 'slug': obj.slug})
 
 
 class AllProductsManager:
@@ -51,6 +59,8 @@ class Product(models.Model):
 
     MIN_RESOLUTION = (400, 400)
     MAX_RESOLUTION = (800, 800)
+    OPTIMAL_RESOLUTION = (800, 600)
+
     MAX_IMAGE_SIZE = 3145728
 
     name = models.CharField(max_length=255, verbose_name='Продукт')
@@ -74,7 +84,7 @@ class Product(models.Model):
             raise MinResolutionErrorException('Разрешение загруженого изображения ниже допустимого значения!')
         if img.height > max_height and img.width > max_width:
             new_img = img.convert('RGB')
-            resized_new_img = new_img.resize((500, 500), Image.ANTIALIAS)
+            resized_new_img = new_img.resize(self.OPTIMAL_RESOLUTION, Image.ANTIALIAS)
         
             filestream = BytesIO()
             resized_new_img.save(filestream, 'JPEG', quality=90)
@@ -100,7 +110,10 @@ class NotebookProduct(Product):
     time_without_charge = models.CharField(max_length=255, verbose_name='Время работы аккумулятора')
 
     image = models.ImageField(verbose_name='Изображение ноутбука', upload_to='notebooks/')
-    
+ 
+    def get_absolute_url(self):
+        return get_product_url(self, 'product_detail')
+   
     def __str__(self):
         return f'{self.category.name}- {self.name}'
 
@@ -117,6 +130,9 @@ class SmartphoneProduct(Product):
     frontal_camera_mp = models.CharField(max_length=255, verbose_name='Фронтальная камера')
 
     image = models.ImageField(verbose_name='Изображение смартфона', upload_to='smartphones/')
+
+    def get_absolute_url(self):
+        return get_product_url(self, 'product_detail')
 
     def __str__(self):
         return f'{self.category.name}- {self.name}'
