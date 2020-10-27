@@ -1,7 +1,8 @@
 from django.shortcuts import render
 from django.views.generic import View, DetailView
 
-from .models import (NotebookProduct, SmartphoneProduct, Category, AllProducts)
+from .models import (NotebookProduct, SmartphoneProduct, Category, 
+	AllProducts, Cart, Customer)
 from .mixins import CategoryDetailMixin
 
 from collections import namedtuple
@@ -53,3 +54,17 @@ class CategoryDetailView(CategoryDetailMixin, DetailView):
 	template_name = 'category_detail.html'
 	context_object_name = 'category'
 	slug_url_kwarg = 'slug'
+
+
+class CartView(View):
+
+	def get(self, request, *args, **kwargs):
+		customer = Customer.objects.get(user=request.user)
+		cart = Cart.objects.get(owner=customer)
+		categories = Category.objects.get_categories()
+		context = {
+			'cart': cart,
+			'categories': categories
+		}
+		return render(request, 'cart.html', context)
+
