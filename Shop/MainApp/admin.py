@@ -3,12 +3,12 @@ from django.contrib import admin
 from .models import (Category, SmartphoneProduct, NotebookProduct, 
         Cart, CartProduct, Customer)
 from .admin_forms import (NotebookCategoryChoices, SmartphoneCategoryChoices, 
-        NotebookAdminForm)
+	NotebookValidationForm, SmartphoneValidationForm)
 
 
 class NotebookProductAdmin(admin.ModelAdmin):
     
-    form = NotebookAdminForm
+    form = NotebookValidationForm
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'category':
@@ -17,6 +17,9 @@ class NotebookProductAdmin(admin.ModelAdmin):
 
 
 class SmartphoneProductAdmin(admin.ModelAdmin):
+	
+    form = SmartphoneValidationForm
+    change_form_template = 'admin.html'
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'category':

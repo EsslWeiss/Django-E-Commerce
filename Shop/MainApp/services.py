@@ -1,4 +1,5 @@
 from django.utils.safestring import mark_safe
+from .models import SmartphoneProduct, NotebookProduct
 
 
 class SpecificationProcessing:
@@ -19,7 +20,7 @@ class SpecificationProcessing:
 			      <td>{value}</td>
 			    </tr>
 	"""
-	
+
 	SPECIFICATION = {
 		'notebookproduct': {
 			'Диагональ': 'diagonal',
@@ -33,44 +34,50 @@ class SpecificationProcessing:
 			'Дисплей': 'display',
 			'Разрешение экрана': 'resolution',
 			'Оперативная память': 'ram',
-			'Встраиваемая память': 'sd',
-			'Максимальный объем встраиваемой памяти': 'sd_max_volume',
+			'Наличие SD карты': 'sd',
+			'Максимальный объем SD карты': 'sd_max_volume',
 			'Главная камера': 'main_camera_mp',
 			'Фронтальная камера': 'frontal_camera_mp'
 		}
 	}
 
-	@classmethod
-	def _mark_safing(cls, content):
-		return mark_safe(cls.TABLE_HEAD + content + cls.TABLE_TAIL)
+	@staticmethod
+	def _to_html(content, table_head, table_tail):
+		return mark_safe(table_head + content + table_tail)
 
 	@classmethod
-	def _smartphone_spec_processing(cls, product):
-		sd_availability = False
+	def _smartphone_spec(cls, product, model_name):
 		content = ''
-		for name, value in cls.SPECIFICATION['smartphoneproduct'].items():
-			if value is 'sd' and getattr(product, value) is sd_availability:
-				content += cls.TABLE_CONTENT.format(name=name, value='Нет в наличии')
+
+		for name, value in cls.SPECIFICATION[model_name].items():
+			if value is 'sd':
+				content += cls.TABLE_CONTENT.format(name=name, value=product.sd_available())
 				continue
-			elif value is 'sd':
-				content += cls.TABLE_CONTENT.format(name=name, value='Есть в наличии')
-				sd_availability = True
-				continue
-			if value is 'sd_max_volume' and sd_availability is False:
-				continue
-			content += cls.TABLE_CONTENT.format(name=name, value=getattr(product, value))	
+
+			content += cls.TABLE_CONTENT.format(name=name, value=getattr(product, value))
+
+		return content
+
+	@classmethod
+	def _notebook_spec(cls, product, model_name):
+		content = ''
+
+		for name, value in cls.SPECIFICATION[model_name].items():
+			content += cls.TABLE_CONTENT.format(name=name, value=getattr(product, value))
+
 		return content
 
 	@classmethod
 	def get_product_specification(cls, product):
-		content = ''
 		model_name = product.__class__._meta.model_name
-		if not (model_name == 'smartphoneproduct'):
-			for name, value in cls.SPECIFICATION[model_name].items():
-				content += cls.TABLE_CONTENT.format(name=name, value=getattr(product, value))
-		else:
-			content = cls._smartphone_spec_processing(product)
-		
-		safing_content = cls._mark_safing(content)
-		return safing_content
 
+		if isinstance(product, SmartphoneProduct):
+			if not product.sd:
+				cls.SPECIFICATION[model_name].pop('Максимальный объем SD карты')
+
+			content = cls._smartphone_spec(product, model_name)
+		elif isinstance(product, NotebookProduct):
+			content = cls._notebook_spec(product, model_name)
+
+		html_content = cls._to_html(content, cls.TABLE_HEAD, cls.TABLE_TAIL)
+		return html_content
