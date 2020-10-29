@@ -1,6 +1,22 @@
 from django.utils.safestring import mark_safe
 from .models import SmartphoneProduct, NotebookProduct
 
+from django.db.models import Sum, Count
+
+
+def recalc_cart_data(cart):    
+	cart = cart.products.aggregate(
+      	final_price=Sum('full_price'), 
+    	total_products=Count('id')
+    )
+	if cart.get('final_price'):
+  		cart.final_price = cart['final_price']
+	else:
+		cart.final_price = 0
+	
+	cart.total_products = cart['total_products']
+	cart.save()
+
 
 class SpecificationProcessing:
 

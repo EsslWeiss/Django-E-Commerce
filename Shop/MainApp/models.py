@@ -12,6 +12,7 @@ from PIL import Image
 from io import BytesIO
 
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.utils import timezone
 
 
 class AllProductsManager:
@@ -237,19 +238,8 @@ class Cart(models.Model):
     in_order = models.BooleanField(default=False)
     for_anonymous_user = models.BooleanField(default=False)
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)  # Create Cart object before using many-to-many relation.
-        
-        cart = self.products.aggregate(
-            final_price=models.Sum('full_price'), 
-            total_products=models.Count('id')
-        )
-        print(cart)
-        if cart.get('final_price'):
-            self.final_price = cart['final_price']
-        else:
-            self.final_price = 0
-        self.total_products += cart['total_products']
+    def __str__(self):
+        return 'Cart with {} products and {}$ final price'.format(self.total_products, self.final_price)
 
 
 class Customer(models.Model):
@@ -259,6 +249,58 @@ class Customer(models.Model):
         verbose_name='Номер телефона')
     address = models.CharField(max_length=255, null=True, 
         verbose_name='Адрес')
+    orders = models.ManyToManyField('Order', verbose_name='Заказы покупателя', 
+        related_name='related_customer')
 
     def __str__(self):
-        return f'{self.user.first_name} {self.user.last_name}'
+        return f'{self.user.username}'
+
+
+class Order(models.Model):
+
+    STATUS_NEW = 'new'
+    STATUS_IN_PROGRESS = 'in_progress'
+    STATUS_READY = 'is_ready'
+    STATUS_COMPLETED = 'completed'
+
+    BUYING_TYPE_SELF = 'self'
+    BUYING_TYPE_DELIVERY = 'delivery'
+
+    STATUS_CHOICES = (
+        (STATUS_NEW, 'новый заказ'),
+        (STATUS_IN_PROGRESS, 'заказ в обработке'),
+        (STATUS_READY, 'заказ готов'),
+        (STATUS_COMPLETED, 'заказ выполнен'),
+    )
+
+    BUYING_TYPE_CHOICES = (
+        (BUYING_TYPE_SELF, 'самовывоз'),
+        (BUYING_TYPE_DELIVERY, 'доставка')
+    )
+
+    customer = models.ForeignKey(Customer, verbose_name='Покупатель', 
+        on_delete=models.CASCADE, related_name='related_orders')
+    cart = models.ForeignKey(Cart, verbose_name='Корзина', 
+        blank=True, null=True,
+        on_delete=models.CASCADE)
+    first_name = models.CharField(max_length=255, verbose_name='Имя')
+    last_name = models.CharField(max_length=255, verbose_name='Фамилия')
+    phone = models.CharField(max_length=11, verbose_name='Номер телефона')
+    address = models.CharField(max_length=1000, verbose_name='Адрес доставки', 
+        blank=True, null=True)
+    status = models.CharField(max_length=70, verbose_name='Статус заказа', 
+        choices=STATUS_CHOICES, default=STATUS_NEW)
+    buying_type = models.CharField(max_length=70, verbose_name='Тип заказа', 
+        choices=BUYING_TYPE_CHOICES, default=BUYING_TYPE_SELF)
+    comment = models.TextField(verbose_name='Комментарий к заказу', blank=True, null=True)
+    created_date = models.DateTimeField(auto_now=True, verbose_name='Дата создания заказа')
+    order_date = models.DateTimeField(verbose_name='Дата получения заказа', default=timezone.now)
+
+    class Meta:
+        ordering = ('created_date', 'order_date')
+
+    def __str__(self):
+        return '{} Order for {}'.format(
+            self.buying_type, 
+            self.customer.user.username
+        )

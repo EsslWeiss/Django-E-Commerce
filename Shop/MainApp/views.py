@@ -1,13 +1,16 @@
 from django.shortcuts import render
 from django.http import HttpResponseRedirect
 from django.views.generic import View, DetailView
+from django.db import transaction
 
 from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
 from .models import (NotebookProduct, SmartphoneProduct, Category, 
 	AllProducts, Cart, CartProduct, Customer)
+from .forms import OrderForm
 
 from .mixins import CategoryDetailMixin, CartMixin
+from .services import recalc_cart_data
 
 from collections import namedtuple
 
@@ -115,7 +118,7 @@ class AddToCartView(CartMixin, View):
 			self.cart.products.add(cart_product)
 			messages.add_message(request, messages.INFO, 'Товар успешно добавлен')
 		
-		self.cart.save()
+		recalc_cart_data(self.cart)  # Recalculate data in cart.
 		return HttpResponseRedirect('/cart/')
 
 
@@ -135,7 +138,7 @@ class RemoveFromCartView(CartMixin, View):
 		)
 		self.cart.products.remove(cart_product)  # deleted! 
 		cart_product.delete()
-		self.cart.save()  # Save the cart!
+		recalc_cart_data(self.cart)  # Recalculate data in cart.
 		messages.add_message(request, messages.INFO, 'Товар успешно удален')
 		return HttpResponseRedirect('/cart/')
 
@@ -156,6 +159,45 @@ class ChangeProductQuantityView(CartMixin, View):
 		)
 		cart_product.quantity = int(request.POST.get('quantity'))
 		cart_product.save()
-		self.cart.save()
+		recalc_cart_data(self.cart)  # Recalculate data in cart.
 		messages.add_message(request, messages.INFO, 'Кол-во товаров в корзине успешно изменено')
 		return HttpResponseRedirect('/cart/')
+
+
+class MakeOrderView(CartMixin, View):
+
+	def get(self, request, *args, **kwargs):
+		form = OrderForm(request.POST or None)
+		categories = Category.objects.get_categories()
+		context = {
+			'cart': self.cart,
+			'categories': categories,
+			'form': form, 
+		}
+		return render(request, 'checkout.html', context)
+
+	@transaction.atomic
+	def post(self, request, *args, **kwargs):
+		form = OrderForm(request.POST or None)
+		customer = Customer.objects.get(user=request.user)
+		if form.is_valid():
+			new_order = form.save(commit=False)
+			new_order.customer = customer
+			new_order.first_name = form.cleaned_data['first_name']
+			new_order.last_name = form.cleaned_data['last_name']
+			new_order.phone = form.cleaned_data['phone']
+			new_order.address = form.cleaned_data['address']
+			new_order.buying_type = form.cleaned_data['buying_type']
+			new_order.order_date = form.cleaned_data['order_date']
+			new_order.comment = form.cleaned_data['comment']
+			new_order.save()
+
+			self.cart.in_order = True
+			new_order.cart = self.cart
+			new_order.save()
+			self.cart.save()
+
+			customer.orders.add(new_order)  # Add customer a new order.
+			messages.add_message(request, messages.INFO, 'Благодарим вас за заказ! Менеджер с вами свяжется в течении дня.')			
+			return HttpResponseRedirect('/')
+		return HttpResponseRedirect('/checkout/')

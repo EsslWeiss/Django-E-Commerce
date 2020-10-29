@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import (Category, SmartphoneProduct, NotebookProduct, 
-        Cart, CartProduct, Customer)
+        Cart, CartProduct, Customer, Order)
 from .admin_forms import (NotebookCategoryChoices, SmartphoneCategoryChoices, 
 	NotebookValidationForm, SmartphoneValidationForm)
 
@@ -33,4 +33,4 @@ admin.site.register(Category)
 admin.site.register(Cart)
 admin.site.register(CartProduct)
 admin.site.register(Customer)
-
+admin.site.register(Order)
