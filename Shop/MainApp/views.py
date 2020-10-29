@@ -60,16 +60,30 @@ class ProductDetailView(CartMixin, CategoryDetailMixin, DetailView):
 	def get_context_data(self, **kwargs):
 		context = super().get_context_data(**kwargs)
 		context['ct_model'] = self.model._meta.model_name
+		context['cart'] = self.cart  # Add cart object to categories page
 		return context
 
 
-class CategoryDetailView(CategoryDetailMixin, DetailView):
+class CategoryDetailView(CartMixin, CategoryDetailMixin, DetailView):
+
+	CATEGORY_SLUG_TO_PRODUCT_MODEL = {
+		'notebooks': NotebookProduct,
+		'smartphones': SmartphoneProduct,
+	}
 
 	model = Category 
 	queryset = Category.objects.all()
 	template_name = 'category_detail.html'
 	context_object_name = 'category'
 	slug_url_kwarg = 'slug'
+
+	def get_context_data(self, **kwargs):
+		# get_object() its Category model.
+		context = super().get_context_data(**kwargs)
+		product_model = self.CATEGORY_SLUG_TO_PRODUCT_MODEL[self.get_object().slug]
+		context['category_products'] = product_model.objects.all()
+		context['cart'] = self.cart
+		return context
 
 
 class CartView(CartMixin, View):

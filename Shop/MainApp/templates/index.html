@@ -108,8 +108,13 @@
                     <a href="{{ product.get_absolute_url }}">{{ product.name }}</a>
                   </h4>
                   <h5>{{ product.price }}$</h5>
-                  <p class="card-text">{{ product.description }}</p>
                 </div>
+
+                  <a class="m-2" href="{% url 'AddToCartView' ct_model=product.get_model_name slug=product.slug %}">
+                    <button class="btn btn-danger">Добавить в корзину</button>
+                  </a>
+
+
                 <div class="card-footer">
                   <small class="text-muted">&#9733; &#9733; &#9733; &#9733; &#9734;</small>
                 </div>

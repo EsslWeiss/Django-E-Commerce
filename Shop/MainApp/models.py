@@ -249,7 +249,7 @@ class Cart(models.Model):
             self.final_price = cart['final_price']
         else:
             self.final_price = 0
-        self.total_products = cart['total_products']
+        self.total_products += cart['total_products']
 
 
 class Customer(models.Model):
