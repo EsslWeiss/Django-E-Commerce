@@ -1,14 +1,21 @@
 from django.shortcuts import render
+from django.http import HttpResponseRedirect
 from django.views.generic import View, DetailView
 
+from django.contrib.contenttypes.models import ContentType
+from django.contrib import messages
 from .models import (NotebookProduct, SmartphoneProduct, Category, 
-	AllProducts, Cart, Customer)
-from .mixins import CategoryDetailMixin
+	AllProducts, Cart, CartProduct, Customer)
+
+from .mixins import CategoryDetailMixin, CartMixin
 
 from collections import namedtuple
 
 
-class MainPageView(View):
+class MainPageView(CartMixin, View):
+	"""
+		CartMixin returned Cart object for current user in session. 
+	"""
 
 	PRODUCT_MODELS = namedtuple('PRODUCT_MODELS', [
 			'notebook', 
@@ -24,13 +31,17 @@ class MainPageView(View):
 		)
 		context = {
 			'categories': categories, 
-			'products': products
+			'products': products,
+			'cart': self.cart
 		}
 
 		return render(request, 'index.html', context)
 
 
-class ProductDetailView(CategoryDetailMixin, DetailView):
+class ProductDetailView(CartMixin, CategoryDetailMixin, DetailView):
+	"""
+		CategoryDetailMixin returned list of 'categories' objects for context.
+	"""
 
 	CT_MODEL_CLASSES = {
 		'notebookproduct': NotebookProduct,
@@ -46,6 +57,11 @@ class ProductDetailView(CategoryDetailMixin, DetailView):
 		self.queryset = self.model._base_manager.all()
 		return super().dispatch(request, *args, **kwargs)
 		
+	def get_context_data(self, **kwargs):
+		context = super().get_context_data(**kwargs)
+		context['ct_model'] = self.model._meta.model_name
+		return context
+
 
 class CategoryDetailView(CategoryDetailMixin, DetailView):
 
@@ -56,15 +72,76 @@ class CategoryDetailView(CategoryDetailMixin, DetailView):
 	slug_url_kwarg = 'slug'
 
 
-class CartView(View):
+class CartView(CartMixin, View):
 
 	def get(self, request, *args, **kwargs):
-		customer = Customer.objects.get(user=request.user)
-		cart = Cart.objects.get(owner=customer)
 		categories = Category.objects.get_categories()
 		context = {
-			'cart': cart,
+			'cart': self.cart,
 			'categories': categories
 		}
 		return render(request, 'cart.html', context)
 
+
+class AddToCartView(CartMixin, View):
+
+	def get(self, request, *args, **kwargs):
+		ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
+		content_type_model = ContentType.objects.get(model=ct_model)
+		product = content_type_model.model_class().objects.get(slug=product_slug)
+
+		cart_product, created = CartProduct.objects.get_or_create(
+			customer=self.cart.owner,
+			cart=self.cart,
+			content_type=content_type_model,
+			object_id=product.id,
+			#full_price=product.price
+		)
+		if created:
+			self.cart.products.add(cart_product)
+			messages.add_message(request, messages.INFO, 'Товар успешно добавлен')
+		
+		self.cart.save()
+		return HttpResponseRedirect('/cart/')
+
+
+class RemoveFromCartView(CartMixin, View):
+
+	def get(self, request, *args, **kwargs):
+		ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
+		content_type_model = ContentType.objects.get(model=ct_model)
+		product = content_type_model.model_class().objects.get(slug=product_slug)
+
+		cart_product = CartProduct.objects.get(
+			customer=self.cart.owner,
+			cart=self.cart,
+			content_type=content_type_model,
+			object_id=product.id,
+			#full_price=product.price
+		)
+		self.cart.products.remove(cart_product)  # deleted! 
+		cart_product.delete()
+		self.cart.save()  # Save the cart!
+		messages.add_message(request, messages.INFO, 'Товар успешно удален')
+		return HttpResponseRedirect('/cart/')
+
+
+class ChangeProductQuantityView(CartMixin, View):
+
+	def post(self, request, *args, **kwargs):
+		ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
+		content_type_model = ContentType.objects.get(model=ct_model)
+		product = content_type_model.model_class().objects.get(slug=product_slug)
+
+		cart_product = CartProduct.objects.get(
+			customer=self.cart.owner,
+			cart=self.cart,
+			content_type=content_type_model,
+			object_id=product.id,
+			#full_price=product.price
+		)
+		cart_product.quantity = int(request.POST.get('quantity'))
+		cart_product.save()
+		self.cart.save()
+		messages.add_message(request, messages.INFO, 'Кол-во товаров в корзине успешно изменено')
+		return HttpResponseRedirect('/cart/')

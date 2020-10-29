@@ -4,29 +4,67 @@
 
 <h3 class="text-center mt-5 mb-5">Ваша корзина {% if not cart.products.count %}пуста{% endif %}</h3>
 
+{% if messages %}
+
+		{% for message in messages %}
+			<div class="alert alert-success alert-dismissible fade show" role="alert">
+			  <strong>{{ message }}</strong>
+			  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+			    <span aria-hidden="true">&times;</span>
+			  </button>
+			</div>
+		{% endfor %}
+
+{% endif %}
+
 <table class="table mt-4">
   <thead class="thead-dark">
     <tr>
-      <th scope="col">#</th>
       <th scope="col">Наименование</th>
       <th scope="col">Изоборажение</th>
       <th scope="col">Цена</th>
-      <th scope="col">Количество</th>
+      <th scope="col">Кол-во</th>
       <th scope="col">Общая цена</th>
+      <th scope="col">Действие</th>
+
     </tr>
   </thead>
   <tbody>
 
   	{% for product in cart.products.all %}
 	    <tr>
-	      <th scope="row">1</th>
 	      <td>{{ product.content_object.name }}</td>
 	      <td class="w-25"><img src="{{ product.content_object.image.url }}" class="img-fluid"></td>
 	      <td>{{ product.content_object.price }}$</td>
-	      <td>{{ product.quantity }}</td>
+	      
+	      <td>
+	      	<form action="{% url 'ChangeProductQuantityView' ct_model=product.content_object.get_model_name slug=product.content_object.slug %}" method="POST">
+	      		{% csrf_token %}
+
+	      		<input type="number" class="form-control" style="width: 80px;" min="1" name="quantity" value="{{ product.quantity }}">
+	      		<br>
+
+	      		<input type="submit" class="btn btn-primary" value="Изменить кол-во">
+	      	</form>
+	      </td>
+	      
 	      <td>{{ product.full_price }}$</td>
+	      
+	      <td>
+	      	<a href="{% url 'RemoveFromCartView' ct_model=product.content_object.get_model_name slug=product.content_object.slug %}">
+	      		<button class="btn btn-danger">Удалить</button>
+	      	</a>
+	      </td>
+
 	    </tr>
 	{% endfor %}
+
+		<tr>
+			<td colspan="2"></td>
+			<td><strong>Итого</strong></td>
+			<td><strong>{{ cart.total_products }}</strong></td>
+			<td><strong>{{ cart.final_price }}$</strong></td>
+		</tr>
 
   </tbody>
 </table>

@@ -37,7 +37,9 @@
         <ul class="navbar-nav ml-auto">
           
           <li class="nav-item">
-            <a class="nav-link" href="{% url 'CartView' %}">Корзина <span class="badge badge-pill badge-danger">0</span></a>
+            <a class="nav-link" href="{% url 'CartView' %}">Корзина <span class="badge badge-pill badge-danger">
+              {{ cart.products.count }}
+            </span></a>
           </li>
         </ul>
       </div>

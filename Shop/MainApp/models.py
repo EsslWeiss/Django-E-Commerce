@@ -44,6 +44,19 @@ class AllProducts:
 
 class CategoryManager(models.Manager):
 
+    # @staticmethod
+    # def set_products():
+    #     self.PRODUCT_MODELS = tuple(c['name'] for c in Category.objects.value('name'))
+
+    @staticmethod
+    def set_category_prod_count():
+        cat_names = tuple(c['name'] for c in Category.objects.values('name'))
+        print(cat_names)
+
+        cat_prod_count = Category.objects.annotate(models.Count(*cat_names)).valus()
+        print(cat_prod_count)
+
+
     PRODUCT_MODELS = ('notebookproduct', 'smartphoneproduct')
     CATEGORY_COUNT_NAME = {
         'Ноутбуки': 'notebookproduct__count',
@@ -54,6 +67,7 @@ class CategoryManager(models.Manager):
         return super().get_queryset()
 
     def get_categories(self):
+        # self.set_categories()
         product_count = list(self.get_queryset()
             .annotate(
                 *(lambda *model_name: [models.Count(name) for name in model_name])
@@ -130,6 +144,9 @@ class Product(models.Model):
 
         super().save(*args, **kwargs)
 
+    def get_model_name(self):
+        return self.__class__.__name__.lower()
+
     def __str__(self):
         return f'{self.name}- {self.price}$'
 
@@ -189,15 +206,19 @@ class CartProduct(models.Model):
 
     customer = models.ForeignKey('Customer', verbose_name='Покупатель', on_delete=models.CASCADE)
     cart = models.ForeignKey('Cart', verbose_name='Корзина',
-                             on_delete=models.CASCADE,
-                             related_name='related_products')
+                on_delete=models.CASCADE,
+                related_name='related_products')
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
 
     quantity = models.PositiveIntegerField(default=1, verbose_name='Количество')
-    full_price = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Общая цена')
+    full_price = models.DecimalField(max_digits=9, decimal_places=2, default=0, verbose_name='Общая цена')
+
+    def save(self, *args, **kwargs):
+        self.full_price = self.quantity * self.content_object.price
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.content_object.name}- {self.quantity} quantity'
@@ -205,19 +226,39 @@ class CartProduct(models.Model):
 
 class Cart(models.Model):
 
-    owner = models.ForeignKey('Customer', verbose_name='Владелец корзины', on_delete=models.CASCADE)
-    products = models.ManyToManyField(CartProduct, blank=True, related_name='related_cart')
+    owner = models.ForeignKey('Customer', null=True, 
+        verbose_name='Владелец корзины', 
+        on_delete=models.CASCADE)
+    products = models.ManyToManyField(CartProduct, blank=True, 
+        related_name='related_cart')
     total_products = models.PositiveIntegerField(default=0)
-    final_price = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Финальная цена')
+    final_price = models.DecimalField(max_digits=9, decimal_places=2, 
+        default=0, verbose_name='Финальная цена')
     in_order = models.BooleanField(default=False)
     for_anonymous_user = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)  # Create Cart object before using many-to-many relation.
+        
+        cart = self.products.aggregate(
+            final_price=models.Sum('full_price'), 
+            total_products=models.Count('id')
+        )
+        print(cart)
+        if cart.get('final_price'):
+            self.final_price = cart['final_price']
+        else:
+            self.final_price = 0
+        self.total_products = cart['total_products']
 
 
 class Customer(models.Model):
 
     user = models.ForeignKey(get_user_model(), verbose_name='Пользователь', on_delete=models.CASCADE)
-    phone = models.CharField(max_length=11, verbose_name='Номер телефона')
-    address = models.CharField(max_length=255, verbose_name='Адрес')
+    phone = models.CharField(max_length=11, null=True, 
+        verbose_name='Номер телефона')
+    address = models.CharField(max_length=255, null=True, 
+        verbose_name='Адрес')
 
     def __str__(self):
         return f'{self.user.first_name} {self.user.last_name}'
