@@ -232,11 +232,24 @@ class Cart(models.Model):
         on_delete=models.CASCADE)
     products = models.ManyToManyField(CartProduct, blank=True, 
         related_name='related_cart')
-    total_products = models.PositiveIntegerField(default=0)
+    total_products = models.PositiveIntegerField(null=True)
     final_price = models.DecimalField(max_digits=9, decimal_places=2, 
         default=0, verbose_name='Финальная цена')
     in_order = models.BooleanField(default=False)
     for_anonymous_user = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        cart = self.products.aggregate(
+            final_price=models.Sum('full_price'), 
+            total_products=models.Max('quantity')
+        )
+        if cart.get('final_price'):
+            self.final_price = cart['final_price']
+        else:
+            self.final_price = 0
+        
+        self.total_products = cart['total_products']
 
     def __str__(self):
         return 'Cart with {} products and {}$ final price'.format(self.total_products, self.final_price)

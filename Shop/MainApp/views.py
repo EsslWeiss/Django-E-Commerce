@@ -10,7 +10,7 @@ from .models import (NotebookProduct, SmartphoneProduct, Category,
 from .forms import OrderForm
 
 from .mixins import CategoryDetailMixin, CartMixin
-from .services import recalc_cart_data
+# from .services import recalc_cart_data
 
 from collections import namedtuple
 
@@ -118,7 +118,8 @@ class AddToCartView(CartMixin, View):
 			self.cart.products.add(cart_product)
 			messages.add_message(request, messages.INFO, 'Товар успешно добавлен')
 		
-		recalc_cart_data(self.cart)  # Recalculate data in cart.
+		#recalc_cart_data(self.cart)  # Recalculate data in cart.
+		self.cart.save()
 		return HttpResponseRedirect('/cart/')
 
 
@@ -138,7 +139,8 @@ class RemoveFromCartView(CartMixin, View):
 		)
 		self.cart.products.remove(cart_product)  # deleted! 
 		cart_product.delete()
-		recalc_cart_data(self.cart)  # Recalculate data in cart.
+		self.cart.save()
+		#recalc_cart_data(self.cart)  # Recalculate data in cart.
 		messages.add_message(request, messages.INFO, 'Товар успешно удален')
 		return HttpResponseRedirect('/cart/')
 
@@ -154,12 +156,15 @@ class ChangeProductQuantityView(CartMixin, View):
 			customer=self.cart.owner,
 			cart=self.cart,
 			content_type=content_type_model,
-			object_id=product.id,
-			#full_price=product.price
+			object_id=product.id
 		)
 		cart_product.quantity = int(request.POST.get('quantity'))
 		cart_product.save()
-		recalc_cart_data(self.cart)  # Recalculate data in cart.
+
+		self.cart.total_products = int(request.POST.get('quantity')) 
+		#recalc_cart_data(self.cart)  # Recalculate data in cart.
+		self.cart.save()
+
 		messages.add_message(request, messages.INFO, 'Кол-во товаров в корзине успешно изменено')
 		return HttpResponseRedirect('/cart/')
 
@@ -198,6 +203,6 @@ class MakeOrderView(CartMixin, View):
 			self.cart.save()
 
 			customer.orders.add(new_order)  # Add customer a new order.
-			messages.add_message(request, messages.INFO, 'Благодарим вас за заказ! Менеджер с вами свяжется в течении дня.')			
+			messages.add_message(request, messages.INFO, 'Благодарим вас за заказ! Менеджер свяжется с вами в течении дня.')			
 			return HttpResponseRedirect('/')
 		return HttpResponseRedirect('/checkout/')
