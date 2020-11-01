@@ -1,28 +1,17 @@
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import (
+	ListAPIView,  # GET all objects
+	RetrieveAPIView,  # GET concreate object
+	ListCreateAPIView,  # GET or create (POST) object
+	RetrieveUpdateAPIView  # update (PUT) object
+) 
 from rest_framework.filters import SearchFilter
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.response import Response
 
 from .serializers import (CategorySerializer, NotebookProductSerializer, 
 	SmartphoneProductSerializer)
+from .pagination import CategoryPagination 
 from ..models import Category, NotebookProduct, SmartphoneProduct
 
 from collections import OrderedDict
-
-
-class CategoryPagination(PageNumberPagination):
-
-	page_size = 2
-	page_size_query_param = 'page_size'
-	max_page_size = 10
-
-	def get_paginated_response(self, data):
-		return Response(OrderedDict([
-			('objects_count', self.page.paginator.count),
-			('next', self.get_next_link()),
-			('previous', self.get_previous_link()),
-			('items', data),
-		]))
 
 
 class CategoryListAPIView(ListAPIView):
@@ -30,6 +19,14 @@ class CategoryListAPIView(ListAPIView):
 	serializer_class = CategorySerializer
 	pagination_class = CategoryPagination
 	queryset = Category.objects.all()
+
+
+class CategoryCreateUpdateAPIView(ListCreateAPIView, RetrieveUpdateAPIView):
+
+	serializer_class = CategorySerializer
+	pagination_class = CategoryPagination
+	queryset = Category.objects.all()
+	lookup_field = 'id'
 
 
 class NotebookListAPIView(ListAPIView):
@@ -55,12 +52,15 @@ class SmartphoneListAPIView(ListAPIView):
 	queryset = SmartphoneProduct.objects.all()
 	filter_backends = (SearchFilter, )
 	search_fields = ('price', 'name')
+	lookup_field = 'id'
 
 
 class NotebookDetailAPIView(RetrieveAPIView):
 
 	serializer_class = NotebookProductSerializer
 	queryset = NotebookProduct.objects.all()
+	filter_backends = (SearchFilter, )
+	search_fields = ('price', 'name')
 	lookup_field = 'id'
 
 

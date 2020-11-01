@@ -1,10 +1,12 @@
 from django.urls import path, include
 from .api_views import (
-	CategoryListAPIView, 
+	CategoryListAPIView,
+	CategoryCreateUpdateAPIView, 
 	NotebookListAPIView, 
 	SmartphoneListAPIView,
 	NotebookDetailAPIView, 
-	SmartphoneDetailAPIView)
+	SmartphoneDetailAPIView
+)
 
 
 notebook_patterns = [
@@ -17,8 +19,13 @@ smartphone_patterns = [
 	path('<str:id>/', SmartphoneDetailAPIView.as_view()),	
 ]
 
+category_patterns = [
+	path('', CategoryListAPIView.as_view()),
+	path('<str:id>/', CategoryCreateUpdateAPIView.as_view()),
+]
+
 urlpatterns = [
-	path('categories/', CategoryListAPIView.as_view()),
+	path('categories/', include(category_patterns)),
 	path('notebookproduct/', include(notebook_patterns)),
 	path('smartphoneproduct/', include(smartphone_patterns)),
 ]
