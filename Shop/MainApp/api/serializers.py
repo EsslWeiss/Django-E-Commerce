@@ -28,12 +28,15 @@ class NotebookProductSerializer(BaseProductSerializer, serializers.ModelSerializ
 	"""
 		Serialize notebook product fields 
 	"""
+	category = CategorySerializer()
+
 	diagonal = serializers.CharField(required=True)
 	display = serializers.CharField(required=True)
 	processor = serializers.CharField(required=True)
 	ram = serializers.CharField(required=True)
 	time_without_charge = serializers.CharField(required=True)
 	image = serializers.ImageField(required=True)
+
 
 	class Meta:
 		model = NotebookProduct
@@ -51,6 +54,8 @@ class SmartphoneProductSerializer(BaseProductSerializer, serializers.ModelSerial
         ("8", "8 GB"),
         ("16", "16 GB"),
     )
+
+	category = CategorySerializer()
 
 	diagonal = serializers.CharField(required=True)
 	display = serializers.CharField(required=True)
