@@ -110,7 +110,8 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Цена')
     description = models.TextField(verbose_name='Описание')
     image = models.ImageField(verbose_name='Изображение')
-    category = models.ForeignKey(Category, verbose_name='Категория', on_delete=models.CASCADE)
+    category = models.ForeignKey(Category
+        , verbose_name='Категория', on_delete=models.CASCADE)
     slug = models.SlugField(unique=True)
 
     class Meta:
@@ -263,7 +264,7 @@ class Customer(models.Model):
     address = models.CharField(max_length=255, null=True, 
         verbose_name='Адрес')
     orders = models.ManyToManyField('Order', verbose_name='Заказы покупателя', 
-        related_name='related_customer')
+        blank=True, related_name='related_customer')
 
     def __str__(self):
         return f'{self.user.username}'
@@ -275,11 +276,13 @@ class Order(models.Model):
     STATUS_IN_PROGRESS = 'in_progress'
     STATUS_READY = 'is_ready'
     STATUS_COMPLETED = 'completed'
+    STATUS_PAYED = 'payed'
 
     BUYING_TYPE_SELF = 'self'
     BUYING_TYPE_DELIVERY = 'delivery'
 
     STATUS_CHOICES = (
+        (STATUS_PAYED, 'Заказ оплачен')
         (STATUS_NEW, 'новый заказ'),
         (STATUS_IN_PROGRESS, 'заказ в обработке'),
         (STATUS_READY, 'заказ готов'),

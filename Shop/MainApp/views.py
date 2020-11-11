@@ -1,7 +1,10 @@
+import stripe
+
 from django.shortcuts import render
 from django.http import HttpResponseRedirect
 from django.views.generic import View, DetailView
 from django.db import transaction
+from django.conf import settings
 
 from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
@@ -10,8 +13,6 @@ from .models import (NotebookProduct, SmartphoneProduct, Category,
 from .forms import OrderForm
 
 from .mixins import CategoryDetailMixin, CartMixin
-# from .services import recalc_cart_data
-
 from collections import namedtuple
 
 
@@ -172,12 +173,21 @@ class ChangeProductQuantityView(CartMixin, View):
 class MakeOrderView(CartMixin, View):
 
 	def get(self, request, *args, **kwargs):
+		stripe.api_key = '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'
+
+		payment_intent = stripe.PaymentIntent.create(
+		  amount=int(self.cart.final_price * 100),
+		  currency='usd',
+		  metadata={'integration_check': 'accept_a_payment'}
+		)
+
 		form = OrderForm(request.POST or None)
 		categories = Category.objects.get_categories()
 		context = {
 			'cart': self.cart,
 			'categories': categories,
 			'form': form, 
+			'client_secret': payment_intent.client_secret
 		}
 		return render(request, 'checkout.html', context)
 

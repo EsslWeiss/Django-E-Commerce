@@ -120,3 +120,8 @@ STATICFILES_DIRS = (
 )
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+
+# Stripe settings
+
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY')
