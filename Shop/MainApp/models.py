@@ -282,7 +282,7 @@ class Order(models.Model):
     BUYING_TYPE_DELIVERY = 'delivery'
 
     STATUS_CHOICES = (
-        (STATUS_PAYED, 'Заказ оплачен')
+        (STATUS_PAYED, 'Заказ оплачен'),
         (STATUS_NEW, 'новый заказ'),
         (STATUS_IN_PROGRESS, 'заказ в обработке'),
         (STATUS_READY, 'заказ готов'),

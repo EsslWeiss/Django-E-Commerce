@@ -1,15 +1,23 @@
 import stripe
 
 from django.shortcuts import render
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.views.generic import View, DetailView
 from django.db import transaction
 from django.conf import settings
 
 from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
-from .models import (NotebookProduct, SmartphoneProduct, Category, 
-	AllProducts, Cart, CartProduct, Customer)
+from .models import (
+	NotebookProduct, 
+	SmartphoneProduct, 
+	Category, 
+	AllProducts, 
+	Cart, 
+	CartProduct, 
+	Customer,
+	Order
+)
 from .forms import OrderForm
 
 from .mixins import CategoryDetailMixin, CartMixin
@@ -168,6 +176,30 @@ class ChangeProductQuantityView(CartMixin, View):
 
 		messages.add_message(request, messages.INFO, 'Кол-во товаров в корзине успешно изменено')
 		return HttpResponseRedirect('/cart/')
+
+
+class MakeOnlinePaymentView(CartMixin, View):
+
+	@transaction.atomic
+	def post(self, request, *args, **kwargs):
+		customer = Customer.objects.get(user=request.user)
+
+		new_order = Order()
+		new_order.customer = customer
+		new_order.first_name = customer.user.first_name
+		new_order.last_name = customer.user.last_name
+		new_order.phone = customer.phone
+		new_order.address = customer.address
+		new_order.buying_type = self.request.POST.get('buying_type')
+		new_order.save()
+
+		self.cart.in_order = True
+		new_order.cart = self.cart
+		new_order.save()
+		self.cart.save()
+
+		customer.orders.add(new_order)  # Add customer a new order.
+		return JsonResponse({"status": "payed"})
 
 
 class MakeOrderView(CartMixin, View):

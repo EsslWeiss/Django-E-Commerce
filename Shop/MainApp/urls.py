@@ -8,7 +8,8 @@ from .views import (
 	AddToCartView, 
 	RemoveFromCartView, 
 	ChangeProductQuantityView,
-	MakeOrderView
+	MakeOrderView,
+	MakeOnlinePaymentView
 )
 
 
@@ -27,4 +28,6 @@ urlpatterns = [
 	path('change-product-quantity/<str:ct_model>/<slug:slug>/', ChangeProductQuantityView.as_view(), 
 		name='ChangeProductQuantityView'),
 	path('checkout/', MakeOrderView.as_view(), name='MakeOrderView'),
+	path('payed-online-order/', MakeOnlinePaymentView.as_view(), name='MakeOnlinePaymentView'),
+
 ]
