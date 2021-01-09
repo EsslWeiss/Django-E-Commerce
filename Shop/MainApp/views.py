@@ -1,205 +1,283 @@
-import stripe
+#import stripe
 
 from django.shortcuts import render
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import (
+	Http404, 
+	HttpResponseRedirect, 
+	JsonResponse
+)
 from django.views.generic import View, DetailView
 from django.db import transaction
-from django.conf import settings
-
+from django.db.models import Count, Max
 from django.contrib.contenttypes.models import ContentType
+
+from django.conf import settings
 from django.contrib import messages
 from .models import (
-	NotebookProduct, 
-	SmartphoneProduct, 
+	Product,
+	NotebookSpec, 
+	SmartphoneSpec, 
 	Category, 
-	AllProducts, 
+	#AllProducts, 
 	Cart, 
 	CartProduct, 
 	Customer,
 	Order
 )
-from .forms import OrderForm
-
+from .forms import OrderForm, ChangeQuantityForm
 from .mixins import CategoryDetailMixin, CartMixin
-from collections import namedtuple
 
 
 class MainPageView(CartMixin, View):
 	"""
-		CartMixin returned Cart object for current user in session. 
+		- CartMixin возвращает корзину для текущего пользователя в request.user
 	"""
 
-	PRODUCT_MODELS = namedtuple('PRODUCT_MODELS', [
-			'notebook', 
-			'smartphone',
-		])
-	PRODUCTS = PRODUCT_MODELS('notebookproduct', 'smartphoneproduct')
-
 	def get(self, request, *args, **kwargs):
-		categories = Category.objects.get_categories()
-		products = AllProducts.objects.get_products_for_mainpage(
-			*self.PRODUCTS, 
-			sort_priority_model=self.PRODUCTS.notebook
-		)
+		"""
+		Возвращаем категории, продукты и корзину пользователя на главную страницу.
+		"""
+		# Категории имеют поле product_count с количеством продуктов в категории.
+		categories = Category.objects.categories_with_prod_count()
+		products = Product.objects.all()
+		cart = self.get_cart(request)
 		context = {
 			'categories': categories, 
 			'products': products,
-			'cart': self.cart
+			'cart': cart
 		}
-
 		return render(request, 'index.html', context)
 
 
-class ProductDetailView(CartMixin, CategoryDetailMixin, DetailView):
+class ProductDetailView(CartMixin, DetailView):
 	"""
-		CategoryDetailMixin returned list of 'categories' objects for context.
+	Представление вовзвращает детальную информацию о продукте.
 	"""
-
-	CT_MODEL_CLASSES = {
-		'notebookproduct': NotebookProduct,
-		'smartphoneproduct': SmartphoneProduct
-	}
-	
+	model = Product
+	queryset = Product.objects.all()
 	context_object_name = 'product'
 	template_name = 'product_detail.html'
 	slug_url_kwarg = 'slug'
 
-	def dispatch(self, request, *args, **kwargs):
-		self.model = self.CT_MODEL_CLASSES[kwargs['ct_model']]
-		self.queryset = self.model._base_manager.all()
-		return super().dispatch(request, *args, **kwargs)
-		
+	def get_object(self, queryset=None):
+		"""
+		- Берем слаг из GET-параметра.
+		- Получаем конкретный продукт по слагу.
+		пример: ProductQueryset
+		"""
+		if not queryset:
+			queryset = self.get_queryset()
+
+		product_slug = self.kwargs.get(self.slug_url_kwarg)
+		try:
+			current_prod = queryset.get(slug=product_slug)
+		except self.model.DoesNotExist:
+			raise Http404('%(verbose_name) not found...' % {
+					'verbose_name': queryset.model._meta.verbose_name
+				}
+			)
+		return current_prod
+
 	def get_context_data(self, **kwargs):
 		context = super().get_context_data(**kwargs)
-		context['ct_model'] = self.model._meta.model_name
-		context['cart'] = self.cart  # Add cart object to categories page
+		context['product'] = self.get_object()
+		context['cart'] = self.get_cart(self.request)
+		context['categories'] = Category.objects.categories_with_prod_count()
 		return context
 
 
-class CategoryDetailView(CartMixin, CategoryDetailMixin, DetailView):
-
-	CATEGORY_SLUG_TO_PRODUCT_MODEL = {
-		'notebooks': NotebookProduct,
-		'smartphones': SmartphoneProduct,
-	}
-
-	model = Category 
+class CategoryDetailView(CartMixin, DetailView):
+	"""
+	Представление возвращает продукты, связанные с конкретной категорией.
+	"""
+	model = Category
 	queryset = Category.objects.all()
+	# context_object_name = 'category'
 	template_name = 'category_detail.html'
-	context_object_name = 'category'
 	slug_url_kwarg = 'slug'
 
+	def get_object(self, queryset=None):
+		"""
+		- Получаем слаг категории из GET-параметров.
+		- Получаем конкретную категорию по слагу.
+		- Получаем связанные с категорией продукты.
+		Возвращаемое значение: tuple('current_category', ProductQueryset)
+		"""
+		if not queryset:
+			queryset = self.get_queryset()
+
+		category_slug = self.kwargs.get(self.slug_url_kwarg)
+		try:
+			current_cat = queryset.get(slug=category_slug)
+		except self.model.DoesNotExist:
+			raise Http404('%(verbose_name) not found...' % {
+					'verbose_name': queryset.model._meta.verbose_name
+				}
+			)		
+		return (
+				current_cat,
+				current_cat.products_related.all()
+			)
+
 	def get_context_data(self, **kwargs):
-		# get_object() its Category model.
 		context = super().get_context_data(**kwargs)
-		product_model = self.CATEGORY_SLUG_TO_PRODUCT_MODEL[self.get_object().slug]
-		context['category_products'] = product_model.objects.all()
-		context['cart'] = self.cart
+		cart = self.get_cart(self.request)
+		categories = Category.objects.categories_with_prod_count()
+		current_cat, cat_products = self.get_object(categories)
+
+		context['current_category'] = current_cat
+		context['category_products'] = cat_products
+		context['cart'] = cart
+		context['categories'] = categories
+		
 		return context
 
 
 class CartView(CartMixin, View):
+	"""
+	Представление возвращает шаблон корзины.
+	"""
+	def pack_products(self, cart_prod):
+		return [
+			{
+				'cart_prod_in_cart_id': cp.cart_prod_in_cart_id,
+				'name': cp.product.name,
+				'price': cp.product.price,
+				'slug': cp.product.slug,
+				'image': cp.product.image,
+				'quantity': cp.quantity,
+				'full_price': cp.full_price
+			}
+			for cp in cart_prod
+		]
 
 	def get(self, request, *args, **kwargs):
-		categories = Category.objects.get_categories()
+		cart = self.get_cart(request)
+		categories = Category.objects.categories_with_prod_count()		
+		cart_prod = cart.cart_products.all()
+		products = self.pack_products(cart_prod)
+
 		context = {
-			'cart': self.cart,
-			'categories': categories
+			'cart': cart,
+			'categories': categories,
+			'products': products,
+			'products_count': cart_prod.count,
 		}
+
 		return render(request, 'cart.html', context)
 
 
-class AddToCartView(CartMixin, View):
+class AJAXAddToCartView(CartMixin, View):
+	"""
+	Представление добавления товара в корзину пользователя.
+	Возможно добавление одного товара в корзину из каталога.
+	Если товар ранее не был добавлен в корзину - добавляем его в корзину и
+	редиректим пользователя на страницу корзины.
+	"""
+	SUCCESS_ADD = 'Товар успешно добавлен в корзину'
 
 	def get(self, request, *args, **kwargs):
-		ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
-		content_type_model = ContentType.objects.get(model=ct_model)
-		product = content_type_model.model_class().objects.get(slug=product_slug)
+		customer, cart = self.get_cart_with_customer(request)
+		product_slug = kwargs.get('slug')
+		product = Product.objects.get(slug=product_slug)
 
 		cart_product, created = CartProduct.objects.get_or_create(
-			customer=self.cart.owner,
-			cart=self.cart,
-			content_type=content_type_model,
-			object_id=product.id,
-			#full_price=product.price
+			customer=customer,
+			cart=cart,
+			product=product
 		)
 		if created:
-			self.cart.products.add(cart_product)
-			messages.add_message(request, messages.INFO, 'Товар успешно добавлен')
-		
-		#recalc_cart_data(self.cart)  # Recalculate data in cart.
-		self.cart.save()
+			cart.cart_products.add(cart_product)  # Добавляем CartProduct в корзину
+			messages.add_message(request, messages.INFO, self.SUCCESS_ADD)
+
+		cart.save()
 		return HttpResponseRedirect('/cart/')
 
 
 class RemoveFromCartView(CartMixin, View):
+	"""
+	Представление удаления товара из корзины.
+	"""
+	ACCESS_DELETE = 'Товар успешно удален'
 
 	def get(self, request, *args, **kwargs):
-		ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
-		content_type_model = ContentType.objects.get(model=ct_model)
-		product = content_type_model.model_class().objects.get(slug=product_slug)
+		customer, cart = self.get_cart_with_customer(request)
+		product_slug = kwargs.get('slug')
+		product = Product.objects.get(slug=product_slug)
 
 		cart_product = CartProduct.objects.get(
-			customer=self.cart.owner,
-			cart=self.cart,
-			content_type=content_type_model,
-			object_id=product.id,
-			#full_price=product.price
+			customer=customer,
+			cart=cart,
 		)
-		self.cart.products.remove(cart_product)  # deleted! 
-		cart_product.delete()
-		self.cart.save()
-		#recalc_cart_data(self.cart)  # Recalculate data in cart.
-		messages.add_message(request, messages.INFO, 'Товар успешно удален')
+		cart.cart_products.remove(cart_product)  # Удаляем CartProduct из корзины.
+		cart_product.delete()  # Удаляем CartProduct
+		cart.save()
+
+		messages.add_message(request, messages.INFO, self.ACCESS_DELETE)
 		return HttpResponseRedirect('/cart/')
 
 
 class ChangeProductQuantityView(CartMixin, View):
+	"""
+	Изменение кол-ва продуктов в корзине.
+	"""
+	def update_product(self, cart, cart_prod):
+		total_products = cart.total_products
+		final_price = cart.final_price
+		return {
+				'quantity': cart_prod.quantity,
+				'full_price': cart_prod.full_price,
+				'total_products': total_products,
+				'final_price': final_price,
+			}
 
 	def post(self, request, *args, **kwargs):
-		ct_model, product_slug = kwargs.get('ct_model'), kwargs.get('slug')
-		content_type_model = ContentType.objects.get(model=ct_model)
-		product = content_type_model.model_class().objects.get(slug=product_slug)
+		p = request.POST
+		if (p.get('quantity') and int(p.get('quantity')) < 0)\
+			or not p.get('cart_prod_in_cart_id'):
+			return Http404('Что-то пошло не так...')
 
-		cart_product = CartProduct.objects.get(
-			customer=self.cart.owner,
-			cart=self.cart,
-			content_type=content_type_model,
-			object_id=product.id
+		customer, cart = self.get_cart_with_customer(request)
+		product_slug = kwargs.get('slug')
+		product = Product.objects.get(slug=product_slug)
+		cp = CartProduct.objects.get(
+			customer=customer,
+			cart_prod_in_cart_id=p.get('cart_prod_in_cart_id')
 		)
-		cart_product.quantity = int(request.POST.get('quantity'))
-		cart_product.save()
 
-		self.cart.total_products = int(request.POST.get('quantity')) 
-		#recalc_cart_data(self.cart)  # Recalculate data in cart.
-		self.cart.save()
+		new_quantity = int(p.get('quantity'))
+		cp.quantity = new_quantity
+		cp.save()  # При сохранении обновляется поле full_price.
 
-		messages.add_message(request, messages.INFO, 'Кол-во товаров в корзине успешно изменено')
-		return HttpResponseRedirect('/cart/')
+		cart.total_products = (cart.total_products + new_quantity)
+		cart.save()  # При сохранении обновляются поля final_price и total_products.
+
+		context = self.update_product(cart, cp)
+		return JsonResponse(context)
 
 
-class MakeOnlinePaymentView(CartMixin, View):
+# class MakeOnlinePaymentView(CartMixin, View):
 
-	@transaction.atomic
-	def post(self, request, *args, **kwargs):
-		customer = Customer.objects.get(user=request.user)
+# 	@transaction.atomic
+# 	def post(self, request, *args, **kwargs):
+# 		customer = Customer.objects.get(user=request.user)
 
-		new_order = Order()
-		new_order.customer = customer
-		new_order.first_name = customer.user.first_name
-		new_order.last_name = customer.user.last_name
-		new_order.phone = customer.phone
-		new_order.address = customer.address
-		new_order.buying_type = self.request.POST.get('buying_type')
-		new_order.save()
+# 		new_order = Order()
+# 		new_order.customer = customer
+# 		new_order.first_name = customer.user.first_name
+# 		new_order.last_name = customer.user.last_name
+# 		new_order.phone = customer.phone
+# 		new_order.address = customer.address
+# 		new_order.buying_type = self.request.POST.get('buying_type')
+# 		new_order.save()
 
-		self.cart.in_order = True
-		new_order.cart = self.cart
-		new_order.save()
-		self.cart.save()
+# 		self.cart.in_order = True
+# 		new_order.cart = self.cart
+# 		new_order.save()
+# 		self.cart.save()
 
-		customer.orders.add(new_order)  # Add customer a new order.
-		return JsonResponse({"status": "payed"})
+# 		customer.orders.add(new_order)  # Add customer a new order.
+# 		return JsonResponse({"status": "payed"})
 
 
 class MakeOrderView(CartMixin, View):

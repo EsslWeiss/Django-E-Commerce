@@ -2,7 +2,9 @@
 
 {% block content %}
 
-<h3 class="text-center mt-5 mb-5">Ваша корзина {% if not cart.products.count %}пуста{% endif %}</h3>
+<h3 class="text-center mt-5 mb-5">Ваша корзина 
+	{% if products_count < 1 %}пуста{% endif %}
+</h3>
 
 {% if messages %}
 
@@ -17,7 +19,7 @@
 
 {% endif %}
 
-{% if cart.products.count %}
+{% if products_count > 0 %}
 <table class="table mt-4">
   <thead class="thead-dark">
     <tr>
@@ -30,30 +32,45 @@
 
     </tr>
   </thead>
+
   <tbody>
 
-  	{% for product in cart.products.all %}
-	    <tr>
-	      <td>{{ product.content_object.name }}</td>
-	      <td class="w-25"><img src="{{ product.content_object.image.url }}" class="img-fluid"></td>
-	      <td>{{ product.content_object.price }}$</td>
+  	{% for product in products %}
+	    <tr class="curr_prod_group">
+
+	       <!-- <input type="hidden" id='cart_prod_in_cart_id' value="{{ product.cart_prod_in_cart_id }}"> -->
+
+	      <td>{{ product.name }}</td>
+	      <td class="w-25"><img src="{{ product.image.url }}" class="img-fluid"></td>
+	      <td>{{ product.price }}$</td>
 	      
 	      <td>
-	      	<form action="{% url 'ChangeProductQuantityView' ct_model=product.content_object.get_model_name slug=product.content_object.slug %}" method="POST">
+
+	      	<form action="{% url 'ChangeProductQuantityView' product.slug %}" method="POST" class="quantity_form_group">
+	      		{% csrf_token %}
+	      		
+	      		<input type="hidden" id='cart_prod_in_cart_id' value="{{ product.cart_prod_in_cart_id }}">
+
+	      		<input type="number" class="form-control" style="width: 80px;" min="1" name="quantity" id='product_quantity' value="{{ product.quantity }}">
+
+	      		
+	      	</form>
+	      
+	      </td>
+		  
+		  <td><p class="full_price_group" id='product_full_price'>{{ product.full_price }}$</p></td>
+	      
+	      <td>
+
+	      	<form class="remove_prod_group" action="{% url 'RemoveFromCartView' product.slug %}" id="remove_product">
 	      		{% csrf_token %}
 
-	      		<input type="number" class="form-control" style="width: 80px;" min="1" name="quantity" value="{{ product.quantity }}">
-	      		<br>
+	      		<input type="hidden" id='cart_prod_in_cart_id' value="{{ product.cart_prod_in_cart_id }}">
 
-	      		<input type="submit" class="btn btn-primary" value="Изменить кол-во">
+		      	<input type="submit" style="width: 100px;" class="btn btn-danger" value="Удалить">
+	      	
 	      	</form>
-	      </td>
-	      
-	      <td>{{ product.full_price }}$</td>
-	      
-	      <td>
-	      	<a href="{% url 'RemoveFromCartView' ct_model=product.content_object.get_model_name slug=product.content_object.slug %}">
-	      		<button class="btn btn-danger">Удалить</button>
+
 	      	</a>
 	      </td>
 
@@ -63,8 +80,8 @@
 		<tr>
 			<td colspan="2"></td>
 			<td><strong>Итого</strong></td>
-			<td><strong>{{ cart.total_products }}</strong></td>
-			<td><strong>{{ cart.final_price }}$</strong></td>
+			<td><strong><p id="total_products">{{ cart.total_products }}</p></strong></td>
+			<td><strong><p id="final_price">{{ cart.final_price }}$</p></strong></td>
 		
 			<td>
 				<a href="{% url 'MakeOrderView' %}">
@@ -75,6 +92,134 @@
 
   </tbody>
 </table>
+
 {% endif %}
 
 {% endblock content %}
+
+{% block javascript %}
+
+	<script type="text/javascript">
+
+
+        function getCookie(name) {
+          let cookieValue = null;
+          if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+              const cookie = cookies[i].trim();
+              // Does this cookie string begin with the name we want?
+              if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+                }
+              }
+            }
+            return cookieValue;
+        }
+
+    	function getCurrProd(curr_form, get_quantity=false) {
+    		let prod = {}
+    		if (get_quantity === true) {
+          		prod['quantity'] = curr_form.product_quantity.value;
+    		}
+    		prod['csrfmiddlewaretoken'] = getCookie('csrftoken');
+    		prod['cart_prod_in_cart_id'] = curr_form.cart_prod_in_cart_id.value;
+        	return prod;
+    	}
+
+   		(function initChangeQuantityEventListeners(){
+   			let currProdGroup = document.querySelectorAll('.curr_prod_group');
+   			console.log('IM HERE!')
+   			for (let i = 0; i < currProdGroup.length; i++) {
+   				let fullPrice = currProdGroup[i].getElementsByClassName('full_price_group');
+   				let forms = currProdGroup[i].getElementsByClassName('quantity_form_group');
+
+   				for (let j = 0; j < forms.length; j++) {
+   					let currForm = forms[j];
+
+   					currForm.addEventListener('click', function(e) {
+   						data = getCurrProd(currForm, get_quantity=true);
+   						method = currForm.method;
+   						url = currForm.action;
+
+   						$.ajax({
+   							type: method,
+   							url: url,
+   							data: data,
+
+   							success: function(data) {
+   								// currForm.quantity = data.quantity;
+					        	document.getElementById('total_products').innerText = 
+					        	data.total_products;
+					        	document.getElementById('cart_total_products').innerText = data.total_products;
+					        	document.getElementById('final_price').innerText = data.final_price + '$';
+					        	fullPrice[j].innerText = data.full_price;
+   							},
+
+   							error: function(response) {
+   								alert(response);
+   							}
+   						});
+
+   						e.preventDefault();
+   					});
+
+   					currForm.addEventListener('submit', function(e) {
+   						data = getCurrProd(currForm, get_quantity=true);
+   						method = currForm.method;
+   						url = currForm.action;
+
+   						$.ajax({
+   							type: method,
+   							url: url,
+   							data: data,
+
+   							success: function(data) {
+   								// currForm.quantity = data.quantity;
+					        	document.getElementById('total_products').innerText = 
+					        	data.total_products;
+					        	document.getElementById('cart_total_products').innerText = data.total_products;
+					        	document.getElementById('final_price').innerText = data.final_price + '$';
+					        	fullPrice[j].innerText = data.full_price;
+   							},
+
+   							error: function(response) {
+   								alert(response);
+   							}
+   						});
+
+   						e.preventDefault();
+   					});
+   				}
+   			}
+		})(); 
+
+		(function initRemoveProductEventListener() {
+        	let removeProductBtn = document.getElementById('remove_prod_group');
+        	
+        	
+		})();
+        removeProductBtn.addEventListener('submit', function(e) {
+        	data = getCurrProd();
+        	form = document.getElementById('remove_product')
+
+        	$.ajax({
+        		type: form.method,
+        		url: form.action,
+        		data: data,
+
+        		success: function(data) {
+        			
+        		},
+
+        		error: function(response) {
+        			
+        		}
+        	});
+
+        	event.preventDefault();
+        })
+	</script>
+
+{% endblock javascript %}

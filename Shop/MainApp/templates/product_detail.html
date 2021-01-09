@@ -25,24 +25,16 @@
 	
 		<hr>
 
-		<a href="{% url 'AddToCartView' ct_model=ct_model slug=product.slug %}"><button class="btn btn-danger">Добавить в корзину</button></a>
+		<a href="{% url 'AddToCartView' slug=product.slug %}">
+			<button class="btn btn-danger">Добавить в корзину</button>
+		</a>
 	</div>
 	
 
-	<strong class="mt-4 mb-3">Характеристики</strong>	
+	<strong class="mt-4 mb-3">Спецификация продукта</strong>	
 	
-	<!-- {{ product|product_specification }} -->
+	{{ product|product_specification }}
 	
-	{% if product.category.slug == "notebooks" %}
-	
-		{% include 'notebook_specification.html' %}
-	
-	{% elif product.category.slug == "smartphones" %}
-	
-		{% include 'smartphone_specification.html' %}
-	
-	{% endif %}	
-
 </div>
 
 {% endblock content %}

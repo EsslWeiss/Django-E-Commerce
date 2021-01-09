@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="en">
 
 <head>
@@ -19,6 +20,10 @@
   <!-- Stripe script -->
   <script src="https://js.stripe.com/v3/"></script>
 
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  
 </head>
 
 <style>
@@ -38,14 +43,23 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarResponsive">
         <ul class="navbar-nav ml-auto">
-          
+
           <li class="nav-item">
-            <a class="nav-link" href="{% url 'CartView' %}">Корзина <span class="badge badge-pill badge-danger">
-              {{ cart.products.count }}
-            </span></a>
+            <!-- Вывод счётчика продуктов в корзине -->
+            
+            <a class="nav-link" href="{% url 'CartView' %}">Корзина 
+              
+              <span id="cart_total_products" class="badge badge-pill badge-danger">
+                {{ cart.total_products }}
+              </span>
+            
+            </a>
+            
           </li>
         </ul>
+
       </div>
+          <span style="color: white;">{{ request.user }}</span>
     </div>
   </nav>
 
@@ -60,7 +74,7 @@
         <div class="list-group">
 
           {% for category in categories %}
-            <a href="{{ category.url }}" class="list-group-item">{{ category.name }} ({{ category.count }})</a>
+            <a href="{{ category.get_absolute_url }}" class="list-group-item">{{ category.name }} ({{ category.product_count }})</a>
           {% endfor %}
 
         </div>
@@ -118,7 +132,11 @@
 
             <div class="col-lg-4 col-md-6 mb-4">
               <div class="card h-100">
-                <a href="{{ product.get_absolute_url }}"><img class="card-img-top" src="{{ product.image.url }}" alt="{{ product.name }}"></a>
+
+                <a href="{{ product.get_absolute_url }}">
+                  <img class="card-img-top" src="{{ product.image.url }}" alt="{{ product.name }}">
+                </a>
+                
                 <div class="card-body">
                   <h4 class="card-title">
                     <a href="{{ product.get_absolute_url }}">{{ product.name }}</a>
@@ -126,7 +144,7 @@
                   <h5>{{ product.price }}$</h5>
                 </div>
 
-                  <a class="m-2" href="{% url 'AddToCartView' ct_model=product.get_model_name slug=product.slug %}">
+                  <a class="m-2" href="{% url 'AddToCartView' slug=product.slug %}">
                     <button class="btn btn-danger">Добавить в корзину</button>
                   </a>
 
@@ -164,7 +182,15 @@
   <!-- Bootstrap core JavaScript -->
 	<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+{% block javascript %}  
+  
+{% endblock javascript %}
+
+<script src="{% static 'javacsript/changeProductQuantity.js' %}"></script>
+
 </body>
 
 </html>
-
