@@ -54,6 +54,17 @@ class CategoryManager(models.Manager):
         )
         return category_prod_count
 
+    def categories_with_prod_count_in_dict(self):
+        categories = self.categories_with_prod_count()
+        return [
+            {
+                'name': c.name,
+                'url': c.get_absolute_url(),
+                'product_count': c.product_count 
+            }
+            for c in categories
+        ]
+
 
 class Category(models.Model):
 

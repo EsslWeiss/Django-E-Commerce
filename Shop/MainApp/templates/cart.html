@@ -62,8 +62,8 @@
 	      
 	      <td>
 
-	      	<form class="remove_prod_group" action="{% url 'RemoveFromCartView' product.slug %}" id="remove_product">
-	      		{% csrf_token %}
+	      	<form class="remove_prod_group" method="POST" action="{% url 'RemoveFromCartView' product.slug %}" id="remove_product">
+            {% csrf_token %}
 
 	      		<input type="hidden" id='cart_prod_in_cart_id' value="{{ product.cart_prod_in_cart_id }}">
 
@@ -80,8 +80,8 @@
 		<tr>
 			<td colspan="2"></td>
 			<td><strong>Итого</strong></td>
-			<td><strong><p id="total_products">{{ cart.total_products }}</p></strong></td>
-			<td><strong><p id="final_price">{{ cart.final_price }}$</p></strong></td>
+			<td><strong><p id="total_products">{{ total_products }}</p></strong></td>
+			<td><strong><p id="final_price">{{ final_price }}$</p></strong></td>
 		
 			<td>
 				<a href="{% url 'MakeOrderView' %}">
@@ -102,7 +102,7 @@
 	<script type="text/javascript">
 
 
-        function getCookie(name) {
+    function getCookie(name) {
           let cookieValue = null;
           if (document.cookie && document.cookie !== '') {
             const cookies = document.cookie.split(';');
@@ -116,9 +116,9 @@
               }
             }
             return cookieValue;
-        }
+    }
 
-    	function getCurrProd(curr_form, get_quantity=false) {
+    function getCurrProd(curr_form, get_quantity=false) {
     		let prod = {}
     		if (get_quantity === true) {
           		prod['quantity'] = curr_form.product_quantity.value;
@@ -126,44 +126,44 @@
     		prod['csrfmiddlewaretoken'] = getCookie('csrftoken');
     		prod['cart_prod_in_cart_id'] = curr_form.cart_prod_in_cart_id.value;
         	return prod;
-    	}
+    }
 
-   		(function initChangeQuantityEventListeners(){
-   			let currProdGroup = document.querySelectorAll('.curr_prod_group');
-   			console.log('IM HERE!')
-   			for (let i = 0; i < currProdGroup.length; i++) {
-   				let fullPrice = currProdGroup[i].getElementsByClassName('full_price_group');
-   				let forms = currProdGroup[i].getElementsByClassName('quantity_form_group');
+   	(function initChangeQuantityEventListeners(){
+   	  let currProdGroup = document.querySelectorAll('.curr_prod_group');
+   			
+   	  for (let i = 0; i < currProdGroup.length; i++) {
+   	    let fullPrice = currProdGroup[i].getElementsByClassName('full_price_group');
+   	    let forms = currProdGroup[i].getElementsByClassName('quantity_form_group');
 
-   				for (let j = 0; j < forms.length; j++) {
-   					let currForm = forms[j];
+   	    for (let j = 0; j < forms.length; j++) {
+   		    let currForm = forms[j];
 
-   					currForm.addEventListener('click', function(e) {
-   						data = getCurrProd(currForm, get_quantity=true);
-   						method = currForm.method;
-   						url = currForm.action;
+   	      currForm.addEventListener('click', function(e) {
+   			    data = getCurrProd(currForm, get_quantity=true);
+   				  method = currForm.method;
+   				  url = currForm.action;
 
-   						$.ajax({
-   							type: method,
-   							url: url,
-   							data: data,
+   				  $.ajax({
+   				    type: method,
+   				    url: url,
+   						data: data,
 
-   							success: function(data) {
-   								// currForm.quantity = data.quantity;
-					        	document.getElementById('total_products').innerText = 
-					        	data.total_products;
-					        	document.getElementById('cart_total_products').innerText = data.total_products;
-					        	document.getElementById('final_price').innerText = data.final_price + '$';
-					        	fullPrice[j].innerText = data.full_price;
-   							},
+   						success: function(data) {
+   							// currForm.quantity = data.quantity;
+					      document.getElementById('total_products').innerText = 
+					      data.total_products;
+					      document.getElementById('cart_total_products').innerText = data.total_products;
+					      document.getElementById('final_price').innerText = data.final_price + '$';
+					      fullPrice[j].innerText = data.full_price;
+   						},
 
-   							error: function(response) {
-   								alert(response);
-   							}
-   						});
-
-   						e.preventDefault();
+   						error: function(response) {
+   						  alert(response);
+   						}
    					});
+
+   				  e.preventDefault();
+   				});
 
    					currForm.addEventListener('submit', function(e) {
    						data = getCurrProd(currForm, get_quantity=true);
@@ -195,31 +195,39 @@
    			}
 		})(); 
 
+
 		(function initRemoveProductEventListener() {
-        	let removeProductBtn = document.getElementById('remove_prod_group');
-        	
-        	
-		})();
-        removeProductBtn.addEventListener('submit', function(e) {
-        	data = getCurrProd();
-        	form = document.getElementById('remove_product')
+      let removeProdBtn = document.querySelectorAll('.remove_prod_group');
 
-        	$.ajax({
-        		type: form.method,
-        		url: form.action,
-        		data: data,
+      for (let i = 0; i < removeProdBtn.length; i++) {
+        let currBtn = removeProdBtn[i];
+        let data = {
+          cart_prod_in_cart_id: currBtn.cart_prod_in_cart_id.value,
+          csrfmiddlewaretoken: getCookie('csrftoken')
+        }
+        // let cp_in_cart_id = currBtn.cart_prod_in_cart_id.value;
 
-        		success: function(data) {
-        			
-        		},
+        currBtn.addEventListener('click', function(e) {
+          $.ajax({
+            type: currBtn.method,
+            url: currBtn.action,
+            data: data,
 
-        		error: function(response) {
-        			
-        		}
-        	});
+            success: function(data) {
+              console.log('res: ', data)
+              window.location.href = data.redirect_url;
+              // window.location.replace()
+            },
 
-        	event.preventDefault();
+            error: function(response) {
+              alert('response error: ', response);
+            }
+          });
+
+          e.preventDefault();
         })
+      }	
+		})();
 	</script>
 
 {% endblock javascript %}

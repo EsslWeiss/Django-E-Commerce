@@ -50,7 +50,7 @@
             <a class="nav-link" href="{% url 'CartView' %}">Корзина 
               
               <span id="cart_total_products" class="badge badge-pill badge-danger">
-                {{ cart.total_products }}
+                {{ total_products }}
               </span>
             
             </a>
@@ -74,7 +74,9 @@
         <div class="list-group">
 
           {% for category in categories %}
-            <a href="{{ category.get_absolute_url }}" class="list-group-item">{{ category.name }} ({{ category.product_count }})</a>
+
+            <a href="{{ category.url }}" class="list-group-item">{{ category.name }} ({{ category.product_count }})</a>
+          
           {% endfor %}
 
         </div>

@@ -85,3 +85,20 @@ class CartMixin:
 		cart = self._get_or_create_cart(customer)
 		cart.save()
 		return (customer, cart)
+
+
+class ProductManageMixin:
+
+	def pack_products(self, cart_prod):
+		return [
+			{
+				'cart_prod_in_cart_id': cp.cart_prod_in_cart_id,
+				'name': cp.product.name,
+				'price': cp.product.price,
+				'slug': cp.product.slug,
+				'image': cp.product.image,
+				'quantity': cp.quantity,
+				'full_price': cp.full_price
+			}
+			for cp in cart_prod
+		]

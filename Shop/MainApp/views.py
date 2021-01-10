@@ -1,5 +1,6 @@
 #import stripe
 
+from django.urls import reverse
 from django.shortcuts import render
 from django.http import (
 	Http404, 
@@ -25,7 +26,7 @@ from .models import (
 	Order
 )
 from .forms import OrderForm, ChangeQuantityForm
-from .mixins import CategoryDetailMixin, CartMixin
+from .mixins import CategoryDetailMixin, CartMixin, ProductManageMixin
 
 
 class MainPageView(CartMixin, View):
@@ -38,13 +39,13 @@ class MainPageView(CartMixin, View):
 		Возвращаем категории, продукты и корзину пользователя на главную страницу.
 		"""
 		# Категории имеют поле product_count с количеством продуктов в категории.
-		categories = Category.objects.categories_with_prod_count()
+		categories = Category.objects.categories_with_prod_count_in_dict()
 		products = Product.objects.all()
 		cart = self.get_cart(request)
 		context = {
 			'categories': categories, 
 			'products': products,
-			'cart': cart
+			'total_products': cart.total_products
 		}
 		return render(request, 'index.html', context)
 
@@ -80,9 +81,12 @@ class ProductDetailView(CartMixin, DetailView):
 
 	def get_context_data(self, **kwargs):
 		context = super().get_context_data(**kwargs)
+		cart = self.get_cart(self.request)
+
 		context['product'] = self.get_object()
-		context['cart'] = self.get_cart(self.request)
-		context['categories'] = Category.objects.categories_with_prod_count()
+		# context['cart'] = cart
+		context['categories'] = Category.objects.categories_with_prod_count_in_dict()
+		context['total_products'] = cart.total_products
 		return context
 
 
@@ -92,7 +96,6 @@ class CategoryDetailView(CartMixin, DetailView):
 	"""
 	model = Category
 	queryset = Category.objects.all()
-	# context_object_name = 'category'
 	template_name = 'category_detail.html'
 	slug_url_kwarg = 'slug'
 
@@ -127,38 +130,26 @@ class CategoryDetailView(CartMixin, DetailView):
 
 		context['current_category'] = current_cat
 		context['category_products'] = cat_products
-		context['cart'] = cart
+		context['total_products'] = cart.total_products
 		context['categories'] = categories
 		
 		return context
 
 
-class CartView(CartMixin, View):
+class CartView(CartMixin, ProductManageMixin, View):
 	"""
 	Представление возвращает шаблон корзины.
 	"""
-	def pack_products(self, cart_prod):
-		return [
-			{
-				'cart_prod_in_cart_id': cp.cart_prod_in_cart_id,
-				'name': cp.product.name,
-				'price': cp.product.price,
-				'slug': cp.product.slug,
-				'image': cp.product.image,
-				'quantity': cp.quantity,
-				'full_price': cp.full_price
-			}
-			for cp in cart_prod
-		]
-
 	def get(self, request, *args, **kwargs):
 		cart = self.get_cart(request)
-		categories = Category.objects.categories_with_prod_count()		
+		categories = Category.objects.categories_with_prod_count_in_dict()		
+		
 		cart_prod = cart.cart_products.all()
 		products = self.pack_products(cart_prod)
 
 		context = {
-			'cart': cart,
+			'total_products': cart.total_products,
+			'final_price': cart.final_price,
 			'categories': categories,
 			'products': products,
 			'products_count': cart_prod.count,
@@ -167,7 +158,7 @@ class CartView(CartMixin, View):
 		return render(request, 'cart.html', context)
 
 
-class AJAXAddToCartView(CartMixin, View):
+class AddToCartView(CartMixin, View):
 	"""
 	Представление добавления товара в корзину пользователя.
 	Возможно добавление одного товара в корзину из каталога.
@@ -194,30 +185,71 @@ class AJAXAddToCartView(CartMixin, View):
 		return HttpResponseRedirect('/cart/')
 
 
-class RemoveFromCartView(CartMixin, View):
+class RemoveFromCartView(CartMixin, ProductManageMixin, View):
 	"""
 	Представление удаления товара из корзины.
 	"""
-	ACCESS_DELETE = 'Товар успешно удален'
+	def post(self, request, *args, **kwargs):
+		if not request.POST.get('cart_prod_in_cart_id'):
+			raise Http404('Что-то пошло не так...')
 
-	def get(self, request, *args, **kwargs):
-		customer, cart = self.get_cart_with_customer(request)
+		cp_in_cart_id = request.POST.get('cart_prod_in_cart_id')
+
 		product_slug = kwargs.get('slug')
 		product = Product.objects.get(slug=product_slug)
 
+		customer, cart = self.get_cart_with_customer(request)
 		cart_product = CartProduct.objects.get(
+			cart_prod_in_cart_id=cp_in_cart_id,
 			customer=customer,
-			cart=cart,
-		)
+			cart=cart
+		)		
 		cart.cart_products.remove(cart_product)  # Удаляем CartProduct из корзины.
 		cart_product.delete()  # Удаляем CartProduct
 		cart.save()
 
-		messages.add_message(request, messages.INFO, self.ACCESS_DELETE)
-		return HttpResponseRedirect('/cart/')
+		# categories = Category.objects.categories_with_prod_count_in_dict()
+		# cart_prod = cart.cart_products.all()
+		# products = self.pack_products(cart_prod)  # Use ProductManageMixin.
+		# context = {
+		# 	'categories': categories,
+		# 	'products': products,
+		# 	'products_count': cart_prod.count(),
+		# }
+		# print(context)
+
+		return JsonResponse({'redirect_url': reverse('CartView')})
+		# return HttpResponseRedirect('/cart/')
 
 
-class ChangeProductQuantityView(CartMixin, View):
+	# def get(self, request, *args, **kwargs):
+	# 	customer, cart = self.get_cart_with_customer(request)
+	# 	product_slug = kwargs.get('slug')
+	# 	product = Product.objects.get(slug=product_slug)
+	# 	# categories = Category.objects.categories_with_prod_count()
+
+	# 	cart_product = CartProduct.objects.get(
+	# 		customer=customer,
+	# 		cart=cart,
+	# 	)
+	# 	cart.cart_products.remove(cart_product)  # Удаляем CartProduct из корзины.
+	# 	cart_product.delete()  # Удаляем CartProduct
+	# 	cart.save()
+
+	# 	# cart_prod = cart.cart_products.all()
+	# 	# products = self.pack_products(cart_prod)
+	# 	# context = {
+	# 	# 	'cart': cart,
+	# 	# 	'categories': categories,
+	# 	# 	'products': products,
+	# 	# 	'products_count': cart_prod.count,
+	# 	# }
+	# 	# messages.add_message(request, messages.INFO, self.ACCESS_DELETE)
+	# 	# return JsonResponse({'redirect': reverse('CartView')})
+	# 	return HttpResponseRedirect('/cart/')
+
+
+class AjaxChangeProductQuantityView(CartMixin, View):
 	"""
 	Изменение кол-ва продуктов в корзине.
 	"""
