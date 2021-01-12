@@ -278,7 +278,7 @@ class CartProduct(models.Model):
 
 class Cart(models.Model):
 
-    owner = models.OneToOneField(  # OneToOneField
+    owner = models.ForeignKey(
         'Customer',
         verbose_name='Владелец корзины',
         related_name='related_cart',
@@ -346,7 +346,7 @@ class Customer(models.Model):
         max_length=255,
         null=True,
         verbose_name='Адрес')
-    
+
     orders = models.ManyToManyField(
         'Order',
         verbose_name='Заказы покупателя',
@@ -384,17 +384,11 @@ class Order(models.Model):
         on_delete=models.CASCADE,
         related_name='related_orders')
 
-    cart = models.OneToOneField(
+    cart = models.ForeignKey(
         Cart,
         verbose_name='Корзина',
-        null=True,
-        on_delete=models.SET_NULL)
-    
-    # cart = models.ForeignKey(  # OLD
-    #     Cart,
-    #     verbose_name='Корзина',
-    #     blank=True, null=True,
-    #     on_delete=models.CASCADE)
+        blank=True, null=True,
+        on_delete=models.CASCADE)
     
     first_name = models.CharField(max_length=255, verbose_name='Имя')
     last_name = models.CharField(max_length=255, verbose_name='Фамилия')

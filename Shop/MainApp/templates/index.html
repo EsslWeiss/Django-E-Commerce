@@ -59,7 +59,7 @@
         </ul>
 
       </div>
-          <span style="color: white;">{{ request.user }}</span>
+          <span style="color: white; text-decoration: none;"><a href="{% url 'UserProfileManageView' %}">{{ request.user }}</a></span>
     </div>
   </nav>
 

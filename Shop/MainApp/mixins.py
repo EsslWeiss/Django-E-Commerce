@@ -13,19 +13,6 @@ from datetime import datetime
 from random import randint
 
 
-class CategoryDetailMixin(SingleObjectMixin):
-	"""
-	Миксин, добавляющий категории к контексту
-	Пример добавляемых категорий: [
-		{'name': cat_name, 'url': cat_url, product_count: prod_in_curr_cat}
-	]
-	"""
-	def get_context_data(self, **kwargs):
-		context = super().get_context_data(**kwargs)
-		context['categories'] = Category.objects.get_categories()
-		return context
-
-
 class CartMixin:
 	"""
 	Миксин добавляет объект корзины для текущего пользователя в request.user
@@ -65,7 +52,10 @@ class CartMixin:
 
 	@staticmethod
 	def _get_or_create_cart(customer):
-		cart, created = Cart.objects.get_or_create(owner=customer)
+		cart, created = Cart.objects.get_or_create(
+			owner=customer, 
+			in_order=False
+		)
 		return cart
 
 	def get_cart(self, request):

@@ -1,4 +1,4 @@
-#import stripe
+import stripe
 
 from django.urls import reverse
 from django.shortcuts import render
@@ -14,6 +14,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from django.conf import settings
 from django.contrib import messages
+
 from .models import (
 	Product,
 	NotebookSpec, 
@@ -25,15 +26,18 @@ from .models import (
 	Customer,
 	Order
 )
-from .forms import OrderForm, ChangeQuantityForm
-from .mixins import CategoryDetailMixin, CartMixin, ProductManageMixin
+from .forms import (
+	OrderForm, 
+	ChangeQuantityForm,
+	UserProfileForm
+)
+from .mixins import CartMixin, ProductManageMixin
 
 
 class MainPageView(CartMixin, View):
 	"""
 		- CartMixin возвращает корзину для текущего пользователя в request.user
 	"""
-
 	def get(self, request, *args, **kwargs):
 		"""
 		Возвращаем категории, продукты и корзину пользователя на главную страницу.
@@ -185,7 +189,7 @@ class AddToCartView(CartMixin, View):
 		return HttpResponseRedirect('/cart/')
 
 
-class RemoveFromCartView(CartMixin, ProductManageMixin, View):
+class AjaxRemoveFromCartView(CartMixin, ProductManageMixin, View):
 	"""
 	Представление удаления товара из корзины.
 	"""
@@ -207,46 +211,8 @@ class RemoveFromCartView(CartMixin, ProductManageMixin, View):
 		cart.cart_products.remove(cart_product)  # Удаляем CartProduct из корзины.
 		cart_product.delete()  # Удаляем CartProduct
 		cart.save()
-
-		# categories = Category.objects.categories_with_prod_count_in_dict()
-		# cart_prod = cart.cart_products.all()
-		# products = self.pack_products(cart_prod)  # Use ProductManageMixin.
-		# context = {
-		# 	'categories': categories,
-		# 	'products': products,
-		# 	'products_count': cart_prod.count(),
-		# }
-		# print(context)
-
+		
 		return JsonResponse({'redirect_url': reverse('CartView')})
-		# return HttpResponseRedirect('/cart/')
-
-
-	# def get(self, request, *args, **kwargs):
-	# 	customer, cart = self.get_cart_with_customer(request)
-	# 	product_slug = kwargs.get('slug')
-	# 	product = Product.objects.get(slug=product_slug)
-	# 	# categories = Category.objects.categories_with_prod_count()
-
-	# 	cart_product = CartProduct.objects.get(
-	# 		customer=customer,
-	# 		cart=cart,
-	# 	)
-	# 	cart.cart_products.remove(cart_product)  # Удаляем CartProduct из корзины.
-	# 	cart_product.delete()  # Удаляем CartProduct
-	# 	cart.save()
-
-	# 	# cart_prod = cart.cart_products.all()
-	# 	# products = self.pack_products(cart_prod)
-	# 	# context = {
-	# 	# 	'cart': cart,
-	# 	# 	'categories': categories,
-	# 	# 	'products': products,
-	# 	# 	'products_count': cart_prod.count,
-	# 	# }
-	# 	# messages.add_message(request, messages.INFO, self.ACCESS_DELETE)
-	# 	# return JsonResponse({'redirect': reverse('CartView')})
-	# 	return HttpResponseRedirect('/cart/')
 
 
 class AjaxChangeProductQuantityView(CartMixin, View):
@@ -312,31 +278,47 @@ class AjaxChangeProductQuantityView(CartMixin, View):
 # 		return JsonResponse({"status": "payed"})
 
 
-class MakeOrderView(CartMixin, View):
-
+class MakeOrderView(CartMixin, ProductManageMixin, View):
+	"""
+	Представление оформление заказа покупателя.
+	"""
+	SUCCESS_MAKE_ORDER = 'Благодарим вас за заказ! Менеджер свяжется с вами в течении дня.'
+	
 	def get(self, request, *args, **kwargs):
+		"""
+		- Инициализируем stripe key.
+		- Инициализируем пустую форму оформления заказа.
+		- Получаем продукты в корзине.
+		- Возвращаем пользователю Html-страницу оформления заказа
+		"""
 		stripe.api_key = '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'
 
+		cart = self.get_cart(request)
+		cp = cart.cart_products.all()
+		products_in_cart = self.pack_products(cp)
+
 		payment_intent = stripe.PaymentIntent.create(
-		  amount=int(self.cart.final_price * 100),
+		  amount=int(cart.final_price * 100),
 		  currency='usd',
 		  metadata={'integration_check': 'accept_a_payment'}
 		)
 
-		form = OrderForm(request.POST or None)
-		categories = Category.objects.get_categories()
+		categories = Category.objects.categories_with_prod_count()
 		context = {
-			'cart': self.cart,
+			'products': products_in_cart,
+			'total_products': cart.total_products,
+			'final_price': cart.final_price,
 			'categories': categories,
-			'form': form, 
+			'form': OrderForm(), 
 			'client_secret': payment_intent.client_secret
 		}
 		return render(request, 'checkout.html', context)
 
 	@transaction.atomic
 	def post(self, request, *args, **kwargs):
-		form = OrderForm(request.POST or None)
-		customer = Customer.objects.get(user=request.user)
+		form = OrderForm(request.POST)
+		customer, cart = self.get_cart_with_customer(request)
+
 		if form.is_valid():
 			new_order = form.save(commit=False)
 			new_order.customer = customer
@@ -349,12 +331,65 @@ class MakeOrderView(CartMixin, View):
 			new_order.comment = form.cleaned_data['comment']
 			new_order.save()
 
-			self.cart.in_order = True
-			new_order.cart = self.cart
+			cart.in_order = True  # Помечаем текущую корзину пользователя как "находящиюся в заказе".
+			new_order.cart = cart
 			new_order.save()
-			self.cart.save()
+			cart.save()
 
-			customer.orders.add(new_order)  # Add customer a new order.
-			messages.add_message(request, messages.INFO, 'Благодарим вас за заказ! Менеджер свяжется с вами в течении дня.')			
+			customer.orders.add(new_order)  # Добавляем пользователю новый заказ.
+			messages.add_message(
+				request, 
+				messages.INFO, 
+				self.SUCCESS_MAKE_ORDER
+			)
 			return HttpResponseRedirect('/')
+
 		return HttpResponseRedirect('/checkout/')
+
+
+class UserProfileManageView(CartMixin, ProductManageMixin, View):
+	"""
+	Представление, обрабатывающее профиль пользователя.
+	"""
+	PROFILE_WAS_CHANGE = 'Профиль был успешно изменен'
+
+	def _get_user_orders(self, customer):
+		return [
+			order
+			for order in customer.orders.all()
+		]
+
+	def get(self, request, *args, **kwargs):
+		customer, cart = self.get_cart_with_customer(request)
+		u_profile_form = UserProfileForm(
+			initial={
+				'username': customer.user.username,
+				'first_name': customer.user.first_name,
+				'last_name': customer.user.last_name,
+				'email': customer.user.email,
+				'phone': customer.phone,
+				'address': customer.address
+			}
+		)
+		context = {
+			'user_profile_form': u_profile_form,
+			'user_orders': self._get_user_orders(customer),
+			'total_products': cart.total_products,
+		}
+		return render(request, 'userprofile.html', context)
+
+	def post(self, request, *args, **kwargs):
+		c, cart = self.get_cart_with_customer(request)
+		form = UserProfileForm(request.POST)
+
+		if form.is_valid():
+			c.user.username = form.cleaned_data['username']
+			c.user.first_name = form.cleaned_data['first_name']
+			c.last_name = form.cleaned_data['last_name']
+			c.phone = form.cleaned_data['phone']
+			c.address = form.cleaned_data['address']
+			return JsonResponse(
+				{'success_msg': self.PROFILE_WAS_CHANGE}
+			)
+
+		return JsonResponse(form.errors)

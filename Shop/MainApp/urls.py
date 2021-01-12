@@ -6,10 +6,11 @@ from .views import (
  	CategoryDetailView, 
  	CartView, 
  	AddToCartView, 
- 	RemoveFromCartView, 
+ 	AjaxRemoveFromCartView, 
  	AjaxChangeProductQuantityView,
  	MakeOrderView,
-# 	MakeOnlinePaymentView
+# 	MakeOnlinePaymentView,
+	UserProfileManageView
 )
 
 
@@ -23,7 +24,8 @@ urlpatterns = [
  	path('cart/', CartView.as_view(), name='CartView'),
  	path('add-to-cart/<slug:slug>/', AddToCartView.as_view(), 
  		name='AddToCartView'),
- 	path('remove-from-cart/<slug:slug>/', RemoveFromCartView.as_view(), 
+ 	
+ 	path('remove-from-cart/<slug:slug>/', AjaxRemoveFromCartView.as_view(), 
  		name='RemoveFromCartView'),
 	path('change-product-quantity/<slug:slug>/', 
 		AjaxChangeProductQuantityView.as_view(), 
@@ -32,4 +34,5 @@ urlpatterns = [
  	path('checkout/', MakeOrderView.as_view(), name='MakeOrderView'),
 # 	path('payed-online-order/', MakeOnlinePaymentView.as_view(), name='MakeOnlinePaymentView'),
 
+	path('profile/', UserProfileManageView.as_view(), name='UserProfileManageView'),
 ]

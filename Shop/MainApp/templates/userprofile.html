@@ -1,0 +1,115 @@
+{% extends 'index.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+
+<div id="change_profile_response"></div>
+
+<div class="row" style="margin-top: 85px; margin-left: -120px;">
+  <div class="col-4">
+    <div class="list-group" id="list-tab" role="tablist">
+      
+      <a class="list-group-item list-group-item-action active" id="list-profile-list" data-toggle="list" href="#list-profile" role="tab" aria-controls="profile">Профиль</a>
+      
+      <a class="list-group-item list-group-item-action" id="list-settings-list" data-toggle="list" href="#list-settings" role="tab" aria-controls="settings">История заказов</a>
+    </div>
+  </div>
+
+  <div class="col-8">
+    <div class="tab-content" id="nav-tabContent">
+      
+      <div class="tab-pane fade show active" id="list-profile" role="tabpanel" aria-labelledby="list-profile-list">
+      	
+      	<form id="user_profile_form" method="POST" action="{% url 'UserProfileManageView' %}">
+      		{% csrf_token %}
+      		
+      		{{ user_profile_form|crispy }}
+      		
+      		<input type="submit" class="btn btn-success btn-block mb-5" value="Изменить профиль">
+      	</form>
+      
+      </div>
+  
+      <div class="tab-pane fade" id="list-settings" role="tabpanel" aria-labelledby="list-settings-list">
+
+      	{% for order in user_orders %}
+			
+			<div class="list-group">
+			  <span style="margin-top: 10px;" class="list-group-item list-group-item-action">
+			    <div class="d-flex w-100 justify-content-between">
+			      <h5 class="mb-1">Статус: <span style="color: blue;">"{{ order.get_status_display }}"</span></h5>
+			      <small>Дата создания заказа: <span style="color: blue;">{{ order.created_date }}</span></small>
+			    </div>
+			    <p class="mb-1">Заказ типа <span style="color: blue;">"{{ order.get_buying_type_display }}"</span> должна 
+			    быть произведена на адрес: <span style="color: green;">{{ order.address }}</span>.</p>
+			    <small><span style="color: green;"><em><strong>Спасибо за заказ!</strong></em></span></small>
+			  </span>
+			</div>
+
+		{% endfor %}
+
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block javascript %}
+	
+	<script type="text/javascript">
+		(function initProfileChangeListener() {
+			console.log('here')
+			let profileForm = document.getElementById('user_profile_form');
+			
+			profileForm.addEventListener('submit', function(e) {
+				console.log('here!!!')
+				$.ajax({
+					type: 'POST',
+					url: upForm.action,
+					data: $(profileForm).serialize(),
+
+					success: function(response) {
+						console.log('SUCCESS!!!!!!!!!!!!!!')
+						let responseDiv = document.getElementById('change_profile_response');
+						responseDiv.setAttribute('class', 'alert alert-success alert-dismissible fade show mt-2');
+						responseDiv.setAttribute('role', 'alert');
+
+						let strongMsg = document.createElement('div');
+						strongMsg.innerText = response.success_msg;
+						let btn = document.createElement('button');
+						btn.setAttribute('type', 'button');
+						btn.setAttribute('class', 'close');
+						btn.setAttribute('data-dismiss', 'alert');
+						btn.setAttribute('aria-label', 'Close');
+
+						let spn = document.createElement('span');
+						spn.setAttribute('aria-hidden', 'true');
+						spn.innerText = '&times;';
+
+						responseDiv.appendChild(strongMsg);
+						responseDiv.appendChild(btn);
+						responseDiv.appendChild(spn);
+					}, 
+
+					error: function(response) {
+						console.log('ERROR.................')
+					}
+				});
+
+				e.preventDefault();
+			})
+		})();
+
+	</script>
+
+{% endblock javascript %}
+
+<!-- <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
+                <strong>{{ message }}</strong>
+
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+
+                  <span aria-hidden="true">&times;</span>
+                </button>
+</div> -->

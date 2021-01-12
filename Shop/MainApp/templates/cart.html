@@ -214,9 +214,7 @@
             data: data,
 
             success: function(data) {
-              console.log('res: ', data)
               window.location.href = data.redirect_url;
-              // window.location.replace()
             },
 
             error: function(response) {

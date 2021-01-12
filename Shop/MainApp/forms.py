@@ -1,5 +1,5 @@
 from django import forms 
-from .models import Order
+from .models import Order, Customer
 
 
 class ChangeQuantityForm(forms.Form):
@@ -51,3 +51,30 @@ class OrderForm(forms.ModelForm):
 			'order_date',
 			'comment'
 		)
+
+
+class UserProfileForm(forms.Form):
+
+	username = forms.CharField(
+		label='Никнейм', 
+		max_length=70,
+		required=True)
+	first_name = forms.CharField(
+		label='Имя', 
+		max_length=70, 
+		required=False)
+	last_name = forms.CharField(
+		label='Фамилия', 
+		max_length=70,
+		required=False)
+	email = forms.EmailField(
+		label='Электронная почта',
+		required=False)
+	phone = forms.CharField(
+		label='Номер телефона', 
+		max_length=12,
+		required=False)
+	address = forms.CharField(
+		label='Адрес', 
+		max_length=125, 
+		required=False)
