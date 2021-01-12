@@ -347,7 +347,7 @@ class MakeOrderView(CartMixin, ProductManageMixin, View):
 		return HttpResponseRedirect('/checkout/')
 
 
-class UserProfileManageView(CartMixin, ProductManageMixin, View):
+class UserProfileManageView(CartMixin, View):
 	"""
 	Представление, обрабатывающее профиль пользователя.
 	"""
@@ -385,11 +385,16 @@ class UserProfileManageView(CartMixin, ProductManageMixin, View):
 		if form.is_valid():
 			c.user.username = form.cleaned_data['username']
 			c.user.first_name = form.cleaned_data['first_name']
-			c.last_name = form.cleaned_data['last_name']
+			c.user.last_name = form.cleaned_data['last_name']
+			c.user.email = form.cleaned_data['email']
 			c.phone = form.cleaned_data['phone']
 			c.address = form.cleaned_data['address']
-			return JsonResponse(
-				{'success_msg': self.PROFILE_WAS_CHANGE}
-			)
+			c.user.save()
+			c.save()
 
-		return JsonResponse(form.errors)
+			messages.add_message(
+				request,
+				messages.INFO,
+				self.PROFILE_WAS_CHANGE
+			)
+			return HttpResponseRedirect(reverse('UserProfileManageView'))

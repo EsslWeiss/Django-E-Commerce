@@ -3,9 +3,22 @@
 
 {% block content %}
 
+	{% if messages %}
+
+    	{% for message in messages %}
+        	<div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
+	        	<strong>{{ message }}</strong>
+	            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+	            <span aria-hidden="true">&times;</span>
+	            </button>
+            </div>
+    	{% endfor %}
+
+	{% endif %}
+
 <div id="change_profile_response"></div>
 
-<div class="row" style="margin-top: 85px; margin-left: -120px;">
+<div class="row" style="margin-top: 70px; margin-left: -120px;">
   <div class="col-4">
     <div class="list-group" id="list-tab" role="tablist">
       
@@ -20,7 +33,7 @@
       
       <div class="tab-pane fade show active" id="list-profile" role="tabpanel" aria-labelledby="list-profile-list">
       	
-      	<form id="user_profile_form" method="POST" action="{% url 'UserProfileManageView' %}">
+      	<form onsubmit="initProfileChangeListener(e)" id="user_profile_form" method="POST" action="{% url 'UserProfileManageView' %}">
       		{% csrf_token %}
       		
       		{{ user_profile_form|crispy }}
@@ -54,62 +67,3 @@
 </div>
 
 {% endblock content %}
-
-{% block javascript %}
-	
-	<script type="text/javascript">
-		(function initProfileChangeListener() {
-			console.log('here')
-			let profileForm = document.getElementById('user_profile_form');
-			
-			profileForm.addEventListener('submit', function(e) {
-				console.log('here!!!')
-				$.ajax({
-					type: 'POST',
-					url: upForm.action,
-					data: $(profileForm).serialize(),
-
-					success: function(response) {
-						console.log('SUCCESS!!!!!!!!!!!!!!')
-						let responseDiv = document.getElementById('change_profile_response');
-						responseDiv.setAttribute('class', 'alert alert-success alert-dismissible fade show mt-2');
-						responseDiv.setAttribute('role', 'alert');
-
-						let strongMsg = document.createElement('div');
-						strongMsg.innerText = response.success_msg;
-						let btn = document.createElement('button');
-						btn.setAttribute('type', 'button');
-						btn.setAttribute('class', 'close');
-						btn.setAttribute('data-dismiss', 'alert');
-						btn.setAttribute('aria-label', 'Close');
-
-						let spn = document.createElement('span');
-						spn.setAttribute('aria-hidden', 'true');
-						spn.innerText = '&times;';
-
-						responseDiv.appendChild(strongMsg);
-						responseDiv.appendChild(btn);
-						responseDiv.appendChild(spn);
-					}, 
-
-					error: function(response) {
-						console.log('ERROR.................')
-					}
-				});
-
-				e.preventDefault();
-			})
-		})();
-
-	</script>
-
-{% endblock javascript %}
-
-<!-- <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
-                <strong>{{ message }}</strong>
-
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-
-                  <span aria-hidden="true">&times;</span>
-                </button>
-</div> -->
